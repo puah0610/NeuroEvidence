@@ -43,23 +43,52 @@ class LexicalNLIVerifier:
         return VerificationLabel.insufficient, max(0.5, 1.0 - overlap)
 
 
+def _resolve_nli_labels(config_id2label: dict | None) -> list[VerificationLabel]:
+    """Map arbitrary model config id2label dictionary to VerificationLabel enum list."""
+    if not config_id2label:
+        return [
+            VerificationLabel.contradicted,
+            VerificationLabel.supported,
+            VerificationLabel.insufficient,
+        ]
+    num_labels = len(config_id2label)
+    resolved = [VerificationLabel.insufficient] * num_labels
+    for idx_key, raw_name in config_id2label.items():
+        try:
+            idx = int(idx_key)
+        except (ValueError, TypeError):
+            continue
+        name = str(raw_name).lower()
+        if any(w in name for w in ("entail", "support", "pos")):
+            resolved[idx] = VerificationLabel.supported
+        elif any(w in name for w in ("contradict", "refut", "neg")):
+            resolved[idx] = VerificationLabel.contradicted
+        elif any(w in name for w in ("neutral", "insuffic", "noinfo", "not_enough")):
+            resolved[idx] = VerificationLabel.insufficient
+    return resolved
+
+
 class TransformerNLIVerifier:
     def __init__(self, model_name: str):
         from sentence_transformers import CrossEncoder
 
         self.model = CrossEncoder(model_name)
+        model_config = getattr(getattr(self.model, "model", None), "config", None)
+        raw_map = (
+            getattr(model_config, "id2label", None)
+            if model_config
+            else getattr(getattr(self.model, "config", None), "id2label", None)
+        )
+        self.labels = _resolve_nli_labels(raw_map)
 
     def verify(self, evidence: str, claim: str) -> tuple[VerificationLabel, float]:
-        logits = np.asarray(self.model.predict([(evidence, claim)]))[0]
+        raw_pred = np.asarray(self.model.predict([(evidence, claim)]))
+        logits = raw_pred[0] if raw_pred.ndim > 1 else raw_pred
         probabilities = np.exp(logits - np.max(logits))
         probabilities = probabilities / probabilities.sum()
         index = int(probabilities.argmax())
-        labels = [
-            VerificationLabel.contradicted,
-            VerificationLabel.supported,
-            VerificationLabel.insufficient,
-        ]
-        return labels[index], float(probabilities[index])
+        label = self.labels[index] if index < len(self.labels) else VerificationLabel.insufficient
+        return label, float(probabilities[index])
 
 
 class CitationVerifier:

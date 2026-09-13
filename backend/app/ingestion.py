@@ -27,6 +27,22 @@ DISCOVERY_QUERIES = {
 }
 
 
+CORE_MANIFEST_COLUMNS = {
+    "source_id",
+    "pmcid",
+    "pmid",
+    "doi",
+    "title",
+    "authors",
+    "year",
+    "journal",
+    "topic",
+    "url",
+    "license",
+    "included",
+}
+
+
 @dataclass(frozen=True)
 class ManifestRecord:
     source_id: str
@@ -41,6 +57,7 @@ class ManifestRecord:
     url: str
     license: str
     included: str
+    abstract: str = ""
 
 
 @dataclass(frozen=True)
@@ -58,11 +75,13 @@ class Chunk:
 def read_manifest(path: Path) -> list[ManifestRecord]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
-        required = set(ManifestRecord.__annotations__)
-        missing = required - set(reader.fieldnames or [])
+        missing = CORE_MANIFEST_COLUMNS - set(reader.fieldnames or [])
         if missing:
             raise ValueError(f"Manifest is missing columns: {', '.join(sorted(missing))}")
-        records = [ManifestRecord(**{key: row.get(key, "").strip() for key in required}) for row in reader]
+        records = [
+            ManifestRecord(**{key: row.get(key, "").strip() for key in ManifestRecord.__annotations__})
+            for row in reader
+        ]
     return [record for record in records if record.included.lower() in {"yes", "true", "1"}]
 
 
@@ -292,21 +311,212 @@ def _text(element: ET.Element | None) -> str:
     return "" if element is None else "".join(element.itertext())
 
 
+def _fetch_pubmed_abstracts_batch(pmids: list[str], chunk_size: int = 40) -> dict[str, str]:
+    """Fetch abstracts for PubMed IDs in batches using NCBI E-utilities."""
+    abstracts: dict[str, str] = {}
+    base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+    headers = {"User-Agent": "NeuroEvidence-FYP/0.1 (educational research)"}
+    with httpx.Client(timeout=30, headers=headers) as client:
+        for i in range(0, len(pmids), chunk_size):
+            chunk = [p for p in pmids[i : i + chunk_size] if p]
+            if not chunk:
+                continue
+            try:
+                resp = client.get(base, params={"db": "pubmed", "id": ",".join(chunk), "retmode": "xml"})
+                if resp.status_code == 200:
+                    root = ET.fromstring(resp.text)
+                    for article in root.findall(".//PubmedArticle"):
+                        pmid_el = article.find(".//MedlineCitation/PMID")
+                        if pmid_el is None or not pmid_el.text:
+                            continue
+                        pmid_val = pmid_el.text.strip()
+                        abstract_texts = article.findall(".//Article/Abstract/AbstractText")
+                        combined = " ".join(_text(el) for el in abstract_texts)
+                        if combined:
+                            abstracts[pmid_val] = clean_text(combined)
+            except Exception as exc:
+                print(f"Warning: could not fetch abstracts for batch {i}: {exc}", file=sys.stderr)
+            sleep(0.2)
+    return abstracts
+
+
+def export_asreview(
+    candidates_path: Path,
+    output_path: Path,
+    fetch_abstracts: bool = True,
+) -> None:
+    """Export candidate records into an ASReview-ready CSV with title, abstract, and metadata."""
+    if not candidates_path.exists():
+        raise FileNotFoundError(f"Candidates file not found: {candidates_path}")
+
+    with candidates_path.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = list(csv.DictReader(handle))
+
+    if not reader:
+        print("No candidates found to export.", file=sys.stderr)
+        return
+
+    pmid_map: dict[str, str] = {}
+    if fetch_abstracts:
+        pmids_to_fetch = [row["pmid"] for row in reader if row.get("pmid") and not row.get("abstract")]
+        if pmids_to_fetch:
+            print(f"Fetching abstracts for {len(pmids_to_fetch)} candidate records from PubMed...")
+            pmid_map = _fetch_pubmed_abstracts_batch(pmids_to_fetch)
+
+    asreview_rows = []
+    for row in reader:
+        pmid = row.get("pmid", "")
+        abstract = row.get("abstract", "") or pmid_map.get(pmid, "")
+        if not abstract:
+            abstract = (
+                f"Neurological research article on {row.get('topic', 'neurology')}. "
+                f"Full text available at {row.get('url', '')}."
+            )
+        asreview_rows.append(
+            {
+                "source_id": row.get("source_id", ""),
+                "title": row.get("title", ""),
+                "abstract": clean_text(abstract),
+                "doi": row.get("doi", ""),
+                "topic": row.get("topic", ""),
+                "authors": row.get("authors", ""),
+                "year": row.get("year", ""),
+                "journal": row.get("journal", ""),
+                "url": row.get("url", ""),
+                "pmcid": row.get("pmcid", ""),
+                "pmid": pmid,
+                "license": row.get("license", ""),
+            }
+        )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "source_id",
+        "title",
+        "abstract",
+        "doi",
+        "topic",
+        "authors",
+        "year",
+        "journal",
+        "url",
+        "pmcid",
+        "pmid",
+        "license",
+    ]
+    with output_path.open("w", encoding="utf-8-sig", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(asreview_rows)
+
+    print(f"Exported {len(asreview_rows)} candidate records to ASReview pool at {output_path}")
+
+
+def sync_asreview(
+    asreview_path: Path,
+    manifest_path: Path,
+    candidates_path: Path,
+) -> None:
+    """Synchronize ASReview screening labels (included=1) into corpus_manifest.csv."""
+    if not asreview_path.exists():
+        raise FileNotFoundError(f"ASReview export file not found: {asreview_path}")
+
+    with asreview_path.open("r", encoding="utf-8-sig", newline="") as handle:
+        asreview_rows = list(csv.DictReader(handle))
+
+    included_identifiers: set[str] = set()
+    for row in asreview_rows:
+        incl_val = str(row.get("included") or row.get("final_included") or "").strip().lower()
+        if incl_val in {"1", "1.0", "yes", "true"}:
+            for key in ("source_id", "doi", "pmcid", "title"):
+                val = row.get(key, "").strip().lower()
+                if val:
+                    included_identifiers.add(val)
+
+    if not included_identifiers:
+        print("No included articles found in the provided ASReview export.", file=sys.stderr)
+        return
+
+    candidates: list[dict[str, str]] = []
+    if candidates_path.exists():
+        with candidates_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            candidates = list(csv.DictReader(handle))
+
+    manifest_records: list[dict[str, str]] = []
+    if manifest_path.exists():
+        with manifest_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            manifest_records = list(csv.DictReader(handle))
+
+    synced_count = 0
+    for candidate in candidates:
+        cand_matches = any(
+            candidate.get(k, "").strip().lower() in included_identifiers
+            for k in ("source_id", "doi", "pmcid", "title")
+            if candidate.get(k)
+        )
+        if cand_matches:
+            matched_row = dict(candidate)
+            matched_row["included"] = "yes"
+            found_idx = next(
+                (
+                    idx
+                    for idx, r in enumerate(manifest_records)
+                    if r.get("source_id") == matched_row["source_id"]
+                    or (r.get("doi") and r.get("doi") == matched_row["doi"])
+                ),
+                None,
+            )
+            if found_idx is not None:
+                manifest_records[found_idx]["included"] = "yes"
+            else:
+                manifest_records.append(matched_row)
+            synced_count += 1
+
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = list(ManifestRecord.__annotations__.keys())
+    with manifest_path.open("w", encoding="utf-8-sig", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(manifest_records)
+
+    print(f"Successfully synced {synced_count} included records into {manifest_path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["discover", "fetch", "index"])
+    parser.add_argument(
+        "command",
+        choices=["discover", "fetch", "index", "export-asreview", "sync-asreview"],
+    )
     parser.add_argument("--manifest", type=Path, default=Path("data/corpus_manifest.csv"))
     parser.add_argument("--raw-dir", type=Path, default=Path("data/raw"))
     parser.add_argument("--export", type=Path, default=Path("data/processed/chunks.jsonl"))
     parser.add_argument("--candidate-output", type=Path, default=Path("data/corpus_candidates.csv"))
+    parser.add_argument("--candidates", type=Path, default=Path("data/corpus_candidates.csv"))
+    parser.add_argument("--asreview-pool", type=Path, default=Path("data/asreview_corpus_pool.csv"))
+    parser.add_argument("--asreview-file", type=Path, default=Path("data/asreview_export.csv"))
+    parser.add_argument("--no-fetch-abstracts", action="store_true", default=False)
     parser.add_argument("--per-topic", type=int, default=30)
     args = parser.parse_args()
+
     if args.command == "discover":
         discover_candidates(args.candidate_output, args.per_topic)
     elif args.command == "fetch":
         fetch_articles(args.manifest, args.raw_dir)
-    else:
+    elif args.command == "index":
         index_articles(args.manifest, args.raw_dir, args.export)
+    elif args.command == "export-asreview":
+        export_asreview(
+            args.candidates,
+            args.asreview_pool,
+            fetch_abstracts=not args.no_fetch_abstracts,
+        )
+    elif args.command == "sync-asreview":
+        sync_asreview(
+            args.asreview_file,
+            args.manifest,
+            args.candidates,
+        )
 
 
 if __name__ == "__main__":

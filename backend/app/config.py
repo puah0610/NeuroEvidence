@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     generation_output_cost_per_million: float = Field(default=1.60, ge=0)
     evidence_threshold: float = Field(default=0.65, ge=0, le=1)
     enable_nli: bool = False
-    nli_model: str = "cross-encoder/nli-deberta-v3-base"
+    nli_model: str = "pritamdeka/PubMedBERT-MNLI-MedNLI"
     database_path: Path = Path("data/app.db")
     chroma_path: Path = Path("data/chroma")
     chroma_collection: str = "neurology_corpus_v1"

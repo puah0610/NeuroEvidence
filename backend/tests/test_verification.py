@@ -5,6 +5,7 @@ from app.models import VerificationLabel
 from app.verification import (
     CitationVerifier,
     LexicalNLIVerifier,
+    _resolve_nli_labels,
     extract_claims,
     verify_answer,
 )
@@ -49,3 +50,28 @@ def test_uncited_factual_claim_is_flagged() -> None:
     )
     assert claims[0].label == VerificationLabel.insufficient
     assert claims[0].citation_markers == []
+
+
+def test_resolve_nli_labels() -> None:
+    # Standard MNLI order
+    mnli_mapping = {0: "entailment", 1: "neutral", 2: "contradiction"}
+    assert _resolve_nli_labels(mnli_mapping) == [
+        VerificationLabel.supported,
+        VerificationLabel.insufficient,
+        VerificationLabel.contradicted,
+    ]
+
+    # DeBERTa order
+    deberta_mapping = {0: "contradiction", 1: "entailment", 2: "neutral"}
+    assert _resolve_nli_labels(deberta_mapping) == [
+        VerificationLabel.contradicted,
+        VerificationLabel.supported,
+        VerificationLabel.insufficient,
+    ]
+
+    # Empty fallback
+    assert _resolve_nli_labels(None) == [
+        VerificationLabel.contradicted,
+        VerificationLabel.supported,
+        VerificationLabel.insufficient,
+    ]
