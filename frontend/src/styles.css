@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #10263f;
+  background: #f7f6f1;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input, textarea { font: inherit; }
+button:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-visible {
+  outline: 3px solid rgba(14, 107, 112, 0.35);
+  outline-offset: 3px;
+}
+
+.paper-grid {
+  background-image:
+    linear-gradient(rgba(16, 38, 63, 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(16, 38, 63, 0.026) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.score-ring {
+  background: conic-gradient(#0e6b70 var(--score), #e6e9e5 0);
+}
+
+.answer-copy p { margin: 0 0 1rem; line-height: 1.75; }
+.answer-copy p:last-child { margin-bottom: 0; }
+
+.fade-up { animation: fadeUp 420ms ease both; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+

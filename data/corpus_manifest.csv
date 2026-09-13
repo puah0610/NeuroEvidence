@@ -1,0 +1,6 @@
+source_id,pmcid,pmid,doi,title,authors,year,journal,topic,url,license,included
+EXAMPLE-PD-001,PMC_REPLACE,PMID_REPLACE,DOI_REPLACE,Replace with a verified PMC Open Access Parkinson's article,Author names,2024,Journal name,Parkinson's disease,https://pmc.ncbi.nlm.nih.gov/articles/PMC_REPLACE/,CC BY,no
+EXAMPLE-EP-001,PMC_REPLACE,PMID_REPLACE,DOI_REPLACE,Replace with a verified PMC Open Access epilepsy article,Author names,2024,Journal name,epilepsy,https://pmc.ncbi.nlm.nih.gov/articles/PMC_REPLACE/,CC BY,no
+EXAMPLE-ST-001,PMC_REPLACE,PMID_REPLACE,DOI_REPLACE,Replace with a verified PMC Open Access stroke article,Author names,2024,Journal name,stroke,https://pmc.ncbi.nlm.nih.gov/articles/PMC_REPLACE/,CC BY,no
+EXAMPLE-MS-001,PMC_REPLACE,PMID_REPLACE,DOI_REPLACE,Replace with a verified PMC Open Access multiple sclerosis article,Author names,2024,Journal name,multiple sclerosis,https://pmc.ncbi.nlm.nih.gov/articles/PMC_REPLACE/,CC BY,no
+
