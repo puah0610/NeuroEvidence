@@ -42,3 +42,19 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-vis
   *, *::before, *::after { animation-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
 
+.layer-badge-1 {
+  background-color: #eef2ff;
+  border-color: #c7d2fe;
+  color: #3730a3;
+}
+.layer-badge-2 {
+  background-color: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+.layer-badge-3 {
+  background-color: #f5f3ff;
+  border-color: #ddd6fe;
+  color: #5b21b6;
+}
+

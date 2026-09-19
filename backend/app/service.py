@@ -108,6 +108,11 @@ class ChatService:
                 + original_answer
             )
 
+        layer_dist: dict[str, int] = {}
+        for citation in verification.citations:
+            layer_key = f"Layer {citation.layer}"
+            layer_dist[layer_key] = layer_dist.get(layer_key, 0) + 1
+
         result = ChatResponse(
             trace_id=trace_id,
             intent=decision.intent,
@@ -119,6 +124,7 @@ class ChatService:
             evidence_score=verification.evidence_score,
             evidence_threshold=self.settings.evidence_threshold,
             warnings=verification.warnings,
+            layer_distribution=layer_dist,
             latency_ms=_elapsed_ms(started),
             model=self.generator.model_name,
             input_tokens=generation.input_tokens,

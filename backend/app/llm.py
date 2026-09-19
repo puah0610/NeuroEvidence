@@ -40,7 +40,8 @@ class OpenAIAdapter:
             model=self.model_name,
             instructions=(
                 "You are an educational neurology assistant for students and researchers. "
-                "Answer clearly, do not diagnose or prescribe, and state uncertainty. This is the plain-LLM "
+                "Answer clearly in structured point form (a main topic followed by bullet points of core clinical concepts). "
+                "Do not diagnose or prescribe, and state uncertainty. This is the plain-LLM "
                 "research baseline: do not invent citations and do not claim to have checked external sources."
             ),
             input=question,
@@ -49,17 +50,23 @@ class OpenAIAdapter:
 
     def generate_grounded(self, question: str, chunks: list[RetrievedChunk]) -> GenerationOutput:
         evidence = "\n\n".join(
-            f"[S{index}] {chunk.title} — {chunk.section or 'Excerpt'}\n{chunk.excerpt}"
+            f"[S{index}] [{chunk.layer_name} | {chunk.layer_source}] {chunk.title} — {chunk.section or 'Excerpt'}\n{chunk.excerpt}"
             for index, chunk in enumerate(chunks, start=1)
         )
         response = self.client.responses.create(
             model=self.model_name,
             instructions=(
-                "You are an educational neurology research assistant. Answer only from the supplied evidence. "
-                "Every paragraph containing a factual claim must end with one or more source markers such as "
-                "[S1] or [S1][S2]. Never cite a marker that is not supplied. If the evidence is incomplete, "
-                "say exactly what cannot be established. Do not diagnose, prescribe, or turn the evidence score "
-                "into medical certainty. Use concise prose suitable for university students."
+                "You are an educational neurology research assistant utilizing a 3-Layer Triad Knowledge Base "
+                "(Layer 1: Foundational Knowledge from NCBI Bookshelf/StatPearls; Layer 2: Clinical Guidelines "
+                "from NICE Guidelines; Layer 3: Empirical Evidence & Trials from PubMed Central/Cochrane). "
+                "Answer only from the supplied evidence. Synthesize across foundational pathophysiology, clinical "
+                "practice guidelines, and empirical clinical trial evidence where available.\n\n"
+                "Format your response in clean point form like ChatGPT:\n"
+                "1. Begin with a '### Main Topic: <Condition/Subject Focus>' heading.\n"
+                "2. Include a '#### Supporting Clinical Evidence:' section with distinct bullet points (using '• **<Subtopic/Focus>:**').\n"
+                "3. Each bullet point must highlight a key clinical finding synthesized from the sources and MUST end with its source marker(s) such as [S1] or [S2].\n"
+                "4. Conclude with: 'This answer summarizes the retrieved educational material across the 3-Layer Triad; it does not provide an individual diagnosis or treatment recommendation.'\n"
+                "Never cite a marker that is not supplied. If the evidence is incomplete, state clearly what cannot be established. Do not diagnose or prescribe."
             ),
             input=f"QUESTION\n{question}\n\nEVIDENCE\n{evidence}",
         )
@@ -80,25 +87,36 @@ class DemoGenerator:
 
     def generate_baseline(self, question: str) -> GenerationOutput:
         topic = _topic_label(question)
-        text = (
-            f"{topic} is a neurological topic with varied clinical features and management approaches. "
-            "A careful answer normally considers mechanisms, symptoms, diagnosis, and treatment options.\n\n"
+        lines = [
+            f"### Main Topic: {topic} (Baseline Overview)",
+            f"{topic} is a neurological condition with multifaceted clinical features and management protocols.",
+            "#### Key Clinical Concepts:",
+            "• **Pathophysiology & Neurobiology:** Understanding underlying cellular and anatomical alterations.",
+            "• **Diagnostic Evaluation:** Clinical semiology, specialist review, and targeted investigation.",
+            "• **Therapeutic Approaches:** Multidisciplinary symptomatic and disease-modifying strategies.",
             "This is a simulated plain-model baseline. It has not retrieved or verified evidence, so its factual "
-            "claims should not be used for research conclusions or medical decisions."
-        )
-        return GenerationOutput(text=text)
+            "claims should not be used for research conclusions or medical decisions.",
+        ]
+        return GenerationOutput(text="\n\n".join(lines))
 
     def generate_grounded(self, question: str, chunks: list[RetrievedChunk]) -> GenerationOutput:
         if not chunks:
             return GenerationOutput("The indexed collection does not contain enough evidence to answer this question.")
-        paragraphs: list[str] = []
-        for index, chunk in enumerate(chunks[:2], start=1):
-            paragraphs.append(f"{chunk.excerpt} [S{index}]")
-        paragraphs.append(
-            "This answer summarizes the retrieved educational material; it does not provide an individual "
+        topic = _topic_label(question)
+        lines: list[str] = [
+            f"### Main Topic: {topic} Evidence Overview",
+            "#### Supporting Clinical Evidence:",
+        ]
+        for index, chunk in enumerate(chunks[:3], start=1):
+            category = chunk.subtopic or chunk.section or f"Layer {chunk.layer} Evidence"
+            layer_short = chunk.layer_name.split(":")[0].strip() if chunk.layer_name else f"Layer {chunk.layer}"
+            lines.append(f"• **{category} ({layer_short}):** {chunk.excerpt} [S{index}]")
+
+        lines.append(
+            "This answer summarizes the retrieved educational material across the 3-Layer Triad; it does not provide an individual "
             "diagnosis or treatment recommendation."
         )
-        return GenerationOutput("\n\n".join(paragraphs))
+        return GenerationOutput("\n\n".join(lines))
 
 
 def _topic_label(question: str) -> str:

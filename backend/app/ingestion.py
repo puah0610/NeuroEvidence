@@ -58,6 +58,10 @@ class ManifestRecord:
     license: str
     included: str
     abstract: str = ""
+    layer: str = "1"
+    layer_name: str = "Layer 1: Foundational Knowledge"
+    layer_source: str = "NCBI Bookshelf / StatPearls"
+    subtopic: str = ""
 
 
 @dataclass(frozen=True)
@@ -233,6 +237,10 @@ def chunk_paragraphs(
             "license": record.license,
             "section": section,
             "preprocessing_version": PREPROCESSING_VERSION,
+            "layer": str(getattr(record, "layer", "1") or "1"),
+            "layer_name": getattr(record, "layer_name", "Layer 1: Foundational Knowledge") or "Layer 1: Foundational Knowledge",
+            "layer_source": getattr(record, "layer_source", "NCBI Bookshelf / StatPearls") or "NCBI Bookshelf / StatPearls",
+            "subtopic": getattr(record, "subtopic", "") or "",
         }
         chunks.append(
             Chunk(

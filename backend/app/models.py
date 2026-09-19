@@ -44,6 +44,10 @@ class SourceRecord(BaseModel):
     section: str | None = None
     excerpt: str
     demo: bool = False
+    layer: int = 1
+    layer_name: str = "Layer 1: Foundational Knowledge"
+    layer_source: str = "NCBI Bookshelf / StatPearls"
+    subtopic: str | None = None
 
 
 class RetrievedChunk(SourceRecord):
@@ -63,6 +67,10 @@ class CitationResult(BaseModel):
     metadata_valid: bool
     verification_note: str
     excerpt: str
+    layer: int = 1
+    layer_name: str = "Layer 1: Foundational Knowledge"
+    layer_source: str = "NCBI Bookshelf / StatPearls"
+    subtopic: str | None = None
 
 
 class ClaimCheck(BaseModel):
@@ -84,6 +92,7 @@ class ChatResponse(BaseModel):
     evidence_score: float | None = Field(default=None, ge=0, le=1)
     evidence_threshold: float | None = None
     warnings: list[str] = Field(default_factory=list)
+    layer_distribution: dict[str, int] = Field(default_factory=dict)
     latency_ms: int
     model: str
     input_tokens: int = 0

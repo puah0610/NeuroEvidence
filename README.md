@@ -4,20 +4,21 @@ NeuroEvidence is a research MVP for a RAG-based neurology assistant with citatio
 
 ## What is included
 
-- React + Tailwind chat interface and evaluation dashboard
-- FastAPI endpoints for chat, sources, feedback, metrics, and health
-- OpenAI Responses API generation and embedding adapters
-- Persistent ChromaDB retrieval with deterministic ingestion
-- SQLite experiment traces and feedback
-- Crossref DOI metadata checks
-- Biomedical NLI verification using `pritamdeka/PubMedBERT-MNLI-MedNLI` with dynamic label mapping
-- ASReview active-learning screening export (`export-asreview`) and synchronization (`sync-asreview`)
-- Dual-track NLI benchmark suite (SciFact external baseline + 120-pair neurology domain dataset)
-- Zero-cost demo mode with a small clearly labelled bundled corpus
-- PMC JATS XML ingestion tool and versioned corpus manifest template
-- Backend tests, Dockerfiles, and Docker Compose
+- **Curated 3-Layer Triad Knowledge Base**: Pre-loaded clinical knowledge base covering Parkinson's disease and epilepsy across three evidence tiers (NCBI Bookshelf, NICE Guidelines, Lancet/Cochrane RCTs & Meta-analyses)
+- **Hybrid Dense + Sparse Retrieval**: Combines BM25 lexical matching with dense semantic embeddings using Reciprocal Rank Fusion (RRF)
+- **React + Tailwind Chat Interface**: Interactive clinical query interface with color-coded layer badges, source inspection drawers, and evaluation dashboards
+- **FastAPI Backend Endpoints**: Full API for chat, sources, feedback, metrics, and health checks
+- **OpenAI Responses API & ChromaDB**: Modern generation and embedding adapters with persistent vector retrieval
+- **Zero-Cost Local Demo Mode**: Instant out-of-the-box local operation with no API key or GPU required
+- **Biomedical NLI Verification**: Fine-grained claim entailment verification powered by `pritamdeka/PubMedBERT-MNLI-MedNLI`
+- **ASReview Active-Learning Pipeline**: Built-in candidate export (`export-asreview`) and synchronization (`sync-asreview`) for machine-assisted literature screening
+- **Dual-Track NLI Benchmark Suite**: External baseline validation against SciFact (Track 1) and a 120-pair neurology domain benchmark (Track 2)
+- **Traceability & Safety**: Guardrail classifiers, SQLite experiment traces, Crossref DOI verification, backend unit tests, and Docker Compose
 
 ## Quick start
+
+> [!NOTE]
+> The application comes **pre-configured with the curated 3-Layer Triad Knowledge Base**. You do **not** need to harvest or build a research corpus to run the application.
 
 ### 1. Configure
 
@@ -52,49 +53,59 @@ docker compose up --build
 
 Open `http://localhost:5173`. Persistent application data is stored in `./data`.
 
-## Build the research corpus
+## Curated 3-Layer Triad Knowledge Base
 
-1. Generate 30 recent PMC Open Access candidates per topic:
+The system ships with a structured, pre-curated **3-Layer Triad Knowledge Base** (see [docs/architecture.md](docs/architecture.md) for full architectural details) catalogued in `data/corpus_manifest.csv`:
 
+1. 🟦 **Layer 1: Foundational Knowledge** (NCBI Bookshelf / StatPearls)
+   - *Epilepsy*: 2017 ILAE seizure classification, seizure semiology and cortical pathophysiology, cellular mechanisms of antiseizure medications.
+   - *Parkinson's Disease*: Substantia nigra dopaminergic neurodegeneration and alpha-synuclein pathology, Hoehn & Yahr clinical progression staging, core dopaminergic pharmacology.
+2. 🟩 **Layer 2: Clinical Guidelines & Consensus** (NICE Guidelines)
+   - *NICE NG217 (Epilepsies)*: Referral pathways, first-line monotherapy algorithms (focal vs generalized), sodium valproate safety and the Pregnancy Prevention Programme (Prevent).
+   - *NICE NG71 (Parkinson's in Adults)*: Specialist clinical diagnostic criteria (UK Brain Bank), quality-of-life stratified pharmacotherapy, motor fluctuation protocols, and advanced therapies.
+3. 🟪 **Layer 3: Empirical Evidence & Trials** (PubMed Central / Cochrane Systematic Reviews)
+   - *Comparative RCTs*: SANAD II trial arms in *The Lancet* (levetiracetam vs sodium valproate in generalized epilepsy; levetiracetam vs lamotrigine in focal epilepsy).
+   - *Meta-Analyses*: Long-term deep brain stimulation (STN vs GPi) efficacy reviews, adjuvant MAO-B vs COMT inhibitor meta-analyses in levodopa-treated patients.
+
+All chunks are pre-indexed and available immediately for both hybrid demo retrieval and ChromaDB indexing.
+
+---
+
+### (Optional) Corpus Extension & Active-Learning Pipeline
+
+If you wish to discover, screen, or index **additional** literature beyond the curated Triad knowledge base, use the built-in ingestion and active-learning toolchain:
+
+#### 1. Candidate Discovery
+Generate 30 recent PMC Open Access candidates per neurology topic:
 ```powershell
 $env:PYTHONPATH = "backend"
 python -m app.ingestion discover
 ```
+This generates `data/corpus_candidates.csv` with candidates marked `included=no`.
 
-The generated `data/corpus_candidates.csv` deliberately marks every row `included=no`. Review relevance, article type, quality, retraction status, duplicates, and the exact licence. Copy accepted rows into `data/corpus_manifest.csv` and change only those rows to `included=yes`.
+#### 2. Active-Learning Screening with ASReview LAB
+To screen large batches of literature rapidly without manual review fatigue:
+1. Export candidates into an ASReview screening pool (retrieves abstracts via PubMed E-utilities):
+   ```powershell
+   $env:PYTHONPATH = "backend"
+   python -m app.ingestion export-asreview --candidates data/corpus_candidates.csv --asreview-pool data/asreview_corpus_pool.csv
+   ```
+2. Screen in ASReview LAB (see protocol in [docs/asreview-workflow.md](docs/asreview-workflow.md)) and export decisions to `data/asreview_export.csv`.
+3. Synchronize screened papers directly back into `data/corpus_manifest.csv`:
+   ```powershell
+   $env:PYTHONPATH = "backend"
+   python -m app.ingestion sync-asreview --asreview-file data/asreview_export.csv --manifest data/corpus_manifest.csv --candidates data/corpus_candidates.csv
+   ```
 
-### Active-learning screening with ASReview LAB
-
-To accelerate candidate screening with active learning without manual bias:
-
-1. Export candidates into an ASReview candidate pool (retrieving PubMed abstracts):
-```powershell
-$env:PYTHONPATH = "backend"
-python -m app.ingestion export-asreview --candidates data/corpus_candidates.csv --asreview-pool data/asreview_corpus_pool.csv
-```
-2. Screen in ASReview LAB (see [docs/asreview-workflow.md](docs/asreview-workflow.md)) and export decisions to `data/asreview_export.csv`.
-3. Synchronize screened papers directly into the corpus manifest:
-```powershell
-$env:PYTHONPATH = "backend"
-python -m app.ingestion sync-asreview --asreview-file data/asreview_export.csv --manifest data/corpus_manifest.csv --candidates data/corpus_candidates.csv
-```
-
-2. Fill `data/corpus_manifest.csv` with the accepted PMC Open Access records whose licences you have checked.
-3. Download and parse the approved PMC JATS XML service:
-
+#### 3. Fetch & Index New PMC Articles
+Download and parse JATS XML from PMC Open Access, then index into ChromaDB:
 ```powershell
 $env:PYTHONPATH = "backend"
 python -m app.ingestion fetch --manifest data/corpus_manifest.csv
-```
-
-4. Index the parsed documents:
-
-```powershell
-$env:PYTHONPATH = "backend"
 python -m app.ingestion index --manifest data/corpus_manifest.csv
 ```
 
-The ingestion command is idempotent: chunk identifiers are derived from the source, section, paragraph range, and preprocessing version.
+---
 
 ## API overview
 
@@ -133,7 +144,7 @@ For solo researcher academic defense guidelines and intra-annotator reliability 
 
 ## Important limitations
 
-- The bundled corpus is only a UI/demo fixture and must not be reported as the research corpus.
+- The curated corpus and assistant are designed strictly for educational and health informatics research; they do not constitute a diagnostic system or clinical decision-support medical device.
 - The NLI checkpoint (`pritamdeka/PubMedBERT-MNLI-MedNLI`) is an experimental research grounding model, not a clinically validated diagnostic system.
 - The evidence score ranks evidence support; it is not the probability that an answer is medically correct.
 - DOI existence is not the same as claim support. Metadata and NLI results are intentionally displayed separately.
