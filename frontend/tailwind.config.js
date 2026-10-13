@@ -11,6 +11,8 @@ export default {
         coral: '#D86E53',
       },
       boxShadow: {
+        '2xs': '0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+        xs: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
         soft: '0 20px 60px rgba(16, 38, 63, 0.09)',
       },
       fontFamily: {

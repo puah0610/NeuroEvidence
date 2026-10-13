@@ -29,6 +29,9 @@ class ChatRequest(BaseModel):
     mode: ChatMode = ChatMode.rag_verified
 
 
+from .ddi.models import DDIReport
+
+
 class SourceRecord(BaseModel):
     source_id: str
     title: str
@@ -48,6 +51,9 @@ class SourceRecord(BaseModel):
     layer_name: str = "Layer 1: Foundational Knowledge"
     layer_source: str = "NCBI Bookshelf / StatPearls"
     subtopic: str | None = None
+    parent_id: str | None = None
+    parent_title: str | None = None
+    breadcrumb: list[str] = Field(default_factory=list)
 
 
 class RetrievedChunk(SourceRecord):
@@ -71,6 +77,9 @@ class CitationResult(BaseModel):
     layer_name: str = "Layer 1: Foundational Knowledge"
     layer_source: str = "NCBI Bookshelf / StatPearls"
     subtopic: str | None = None
+    parent_id: str | None = None
+    parent_title: str | None = None
+    breadcrumb: list[str] = Field(default_factory=list)
 
 
 class ClaimCheck(BaseModel):
@@ -93,6 +102,7 @@ class ChatResponse(BaseModel):
     evidence_threshold: float | None = None
     warnings: list[str] = Field(default_factory=list)
     layer_distribution: dict[str, int] = Field(default_factory=dict)
+    ddi_report: DDIReport | None = None
     latency_ms: int
     model: str
     input_tokens: int = 0

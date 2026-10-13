@@ -9,11 +9,6 @@ SUPPORTED_TERMS = {
     "parkinson's": "Parkinson's disease",
     "epilepsy": "epilepsy",
     "seizure": "epilepsy",
-    "stroke": "stroke",
-    "cerebrovascular": "stroke",
-    "multiple sclerosis": "multiple sclerosis",
-    " ms ": "multiple sclerosis",
-    "demyelination": "multiple sclerosis",
     "levodopa": "Parkinson's disease",
     "carbidopa": "Parkinson's disease",
     "substantia nigra": "Parkinson's disease",
@@ -32,11 +27,15 @@ SUPPORTED_TERMS = {
     "ilae": "epilepsy",
     "electroencephal": "epilepsy",
     "antiseizure": "epilepsy",
-    "thrombolysis": "stroke",
-    "ischemic": "stroke",
-    "haemorrhagic": "stroke",
-    "hemorrhagic": "stroke",
-    "optic neuritis": "multiple sclerosis",
+    "carbamazepine": "epilepsy",
+    "ethosuximide": "epilepsy",
+    "selegiline": "Parkinson's disease",
+    "rasagiline": "Parkinson's disease",
+    "entacapone": "Parkinson's disease",
+    "metoclopramide": "Parkinson's disease",
+    "haloperidol": "Parkinson's disease",
+    "pramipexole": "Parkinson's disease",
+    "ropinirole": "Parkinson's disease",
 }
 
 EMERGENCY_PATTERNS = (
@@ -112,6 +111,6 @@ def classify_query(question: str) -> SafetyDecision:
     return SafetyDecision(
         Intent.out_of_scope,
         None,
-        "This research prototype currently covers educational questions about Parkinson's disease, "
-        "epilepsy, stroke, and multiple sclerosis. Please rephrase your question within one of those topics.",
+        "This research prototype currently covers educational questions about Parkinson's disease "
+        "and epilepsy. Please rephrase your question within one of those topics.",
     )

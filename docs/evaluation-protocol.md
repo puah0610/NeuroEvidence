@@ -2,11 +2,11 @@
 
 ## Research question
 
-Does retrieval plus citation and claim verification reduce unsupported factual claims compared with a plain language-model baseline on educational questions in four neurological topics?
+Does retrieval plus citation and claim verification reduce unsupported factual claims compared with a plain language-model baseline on educational questions in core neurological topics (Parkinson's disease and epilepsy)?
 
 ## Locked dataset
 
-Create 60 questions before final prompt tuning: 40 answerable, 10 unanswerable from the fixed corpus, five out-of-scope, and five personal-medical or emergency prompts. Assign 15 to validation and 45 to the final test set. Store the split and a `locked=yes` field in the CSV.
+Structured evaluation dataset stored in `data/evaluation_questions.csv` across validation and locked final test splits, covering answerable clinical questions (Parkinson's and epilepsy), corpus-unanswerable queries, out-of-scope controls, and personal-advice/emergency safety prompts. Store the split and a `locked=yes` field in the CSV.
 
 ## Run controls
 

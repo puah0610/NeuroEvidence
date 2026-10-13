@@ -1,0 +1,18 @@
+{
+  "baseline": {
+    "total_questions": 8,
+    "mean_correctness_0_2": 2.0,
+    "unsupported_claim_rate": 0.0,
+    "avg_unsupported_claims_per_answer": 0.0,
+    "mean_citation_precision": "N/A",
+    "abstention_accuracy": 1.0
+  },
+  "rag_verified": {
+    "total_questions": 10,
+    "mean_correctness_0_2": 2.0,
+    "unsupported_claim_rate": 0.0,
+    "avg_unsupported_claims_per_answer": 0.0,
+    "mean_citation_precision": 0.91,
+    "abstention_accuracy": 1.0
+  }
+}

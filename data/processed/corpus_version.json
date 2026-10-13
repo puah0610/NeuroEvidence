@@ -1,0 +1,9 @@
+{
+  "collection": "neurology_corpus_v1",
+  "documents": 144,
+  "chunks": 2998,
+  "preprocessing_version": "jats-v1",
+  "embedding_provider": "local",
+  "embedding_model": "pritamdeka/S-PubMedBert-MS-MARCO",
+  "manifest_sha256": "89dfa1af7fcd0f51bfccdb365c81eb95bb8c19291db93745536e6cde50f2dc13"
+}

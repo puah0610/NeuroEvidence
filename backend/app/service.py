@@ -4,9 +4,10 @@ from uuid import uuid4
 
 from .config import Settings
 from .database import Database
-from .llm import DemoGenerator, Generator, OpenAIAdapter
+from .ddi.checker import get_ddi_checker
+from .llm import DemoGenerator, Generator, create_llm_adapter
 from .models import ChatRequest, ChatResponse, Intent
-from .retrieval import ChromaRetriever, DemoRetriever
+from .retrieval import ChromaRetriever, DemoRetriever, TransformerDenseEmbedder
 from .safety import classify_query
 from .verification import CitationVerifier, make_nli, verify_answer
 
@@ -15,13 +16,32 @@ class ChatService:
     def __init__(self, settings: Settings, database: Database):
         self.settings = settings
         self.database = database
-        if not settings.demo_mode and not settings.openai_api_key:
-            raise RuntimeError("OPENAI_API_KEY is required when DEMO_MODE=false")
-        if settings.openai_enabled:
-            adapter = OpenAIAdapter(settings)
+        self.ddi_checker = get_ddi_checker()
+        if not settings.demo_mode:
+            if settings.llm_provider.lower() == "gemini" and not settings.gemini_api_key:
+                raise RuntimeError("GEMINI_API_KEY is required when LLM_PROVIDER=gemini and DEMO_MODE=false")
+            if settings.llm_provider.lower() == "openai" and not settings.openai_api_key:
+                raise RuntimeError("OPENAI_API_KEY is required when LLM_PROVIDER=openai and DEMO_MODE=false")
+
+        def _get_embedder(adapter):
+            if settings.embedding_provider.lower() == "local":
+                return TransformerDenseEmbedder(settings.dense_model)
+            return adapter
+
+        if settings.active_llm_enabled:
+            # Full production: ChromaDB retrieval + real LLM generation
+            adapter = create_llm_adapter(settings)
             self.generator: Generator = adapter
-            self.retriever = ChromaRetriever(settings, adapter)
+            self.retriever = ChromaRetriever(settings, _get_embedder(adapter))
+        elif settings.smart_demo_enabled:
+            # Smart demo: real LLM generation
+            # If ChromaDB collection has chunks, utilize ChromaRetriever; otherwise in-memory DemoRetriever
+            adapter = create_llm_adapter(settings)
+            self.generator: Generator = adapter
+            chroma = ChromaRetriever(settings, _get_embedder(adapter))
+            self.retriever = chroma if chroma.collection.count() > 0 else DemoRetriever(settings)
         else:
+            # Pure demo: no API key — template DemoGenerator + in-memory DemoRetriever
             self.generator = DemoGenerator()
             self.retriever = DemoRetriever(settings)
         self.citation_verifier = CitationVerifier(settings)
@@ -67,6 +87,9 @@ class ChatService:
             self.database.save_trace(request.session_id, request.question, result)
             return result
 
+        # Scan query for drug interactions (combining local rules & live openFDA API)
+        ddi_report = await self.ddi_checker.analyze_query(request.question)
+
         chunks = self.retriever.search(request.question, decision.topic)
         if not chunks:
             answer = (
@@ -81,6 +104,7 @@ class ChatService:
                 evidence_score=0.0,
                 evidence_threshold=self.settings.evidence_threshold,
                 warnings=["Retrieval returned no usable evidence."],
+                ddi_report=ddi_report if (ddi_report.has_interaction or len(ddi_report.drugs_detected) >= 2) else None,
                 latency_ms=_elapsed_ms(started),
                 model=self.generator.model_name,
                 demo_mode=self.settings.demo_mode,
@@ -89,7 +113,7 @@ class ChatService:
             self.database.save_trace(request.session_id, request.question, result)
             return result
 
-        generation = self.generator.generate_grounded(request.question, chunks)
+        generation = self.generator.generate_grounded(request.question, chunks, ddi_report=ddi_report)
         original_answer = generation.text
         verification = await verify_answer(
             original_answer,
@@ -97,7 +121,14 @@ class ChatService:
             self.citation_verifier,
             self.nli,
             self.settings.evidence_threshold,
+            retriever=self.retriever,
+            topic=decision.topic,
+            enable_cross_chunk_fallback=self.settings.enable_cross_chunk_fallback,
+            enable_corrective_retrieval=self.settings.enable_corrective_retrieval,
+            max_corrective_claims=self.settings.corrective_retrieval_max_claims,
         )
+        if verification.chunks:
+            chunks = verification.chunks
         answer = original_answer
         if verification.evidence_score < self.settings.evidence_threshold or any(
             item.label.value == "contradicted" for item in verification.claims
@@ -125,6 +156,7 @@ class ChatService:
             evidence_threshold=self.settings.evidence_threshold,
             warnings=verification.warnings,
             layer_distribution=layer_dist,
+            ddi_report=ddi_report if (ddi_report.has_interaction or len(ddi_report.drugs_detected) >= 2) else None,
             latency_ms=_elapsed_ms(started),
             model=self.generator.model_name,
             input_tokens=generation.input_tokens,
@@ -141,8 +173,8 @@ class ChatService:
 
     def _cost(self, input_tokens: int, output_tokens: int) -> float:
         value = (
-            input_tokens * self.settings.generation_input_cost_per_million
-            + output_tokens * self.settings.generation_output_cost_per_million
+            input_tokens * self.settings.active_input_cost_per_million
+            + output_tokens * self.settings.active_output_cost_per_million
         ) / 1_000_000
         return round(value, 6)
 

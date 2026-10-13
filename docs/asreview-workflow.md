@@ -35,14 +35,16 @@ This generates `data/corpus_candidates.csv` with 120 candidate papers marked `in
 
 ---
 
-### Step 2.2: Export to ASReview Candidate Pool
-Export candidates into an ASReview-optimized CSV containing `title`, `abstract`, `doi`, `topic`, `authors`, and `url`:
+### Step 2.2: Export to Topic-Specific ASReview Candidate Pools
+Export candidates into separate disease-specific ASReview CSVs with abstracts:
 
 ```powershell
 $env:PYTHONPATH = "backend"
-.\.venv\Scripts\python.exe -m app.ingestion export-asreview `
-  --candidates data/corpus_candidates.csv `
-  --asreview-pool data/asreview_corpus_pool.csv
+# Export Parkinson's candidate pool (30 records):
+python -m app.ingestion export-asreview --topic pd --asreview-pool data/asreview_pool_pd.csv
+
+# Export Epilepsy candidate pool (30 records):
+python -m app.ingestion export-asreview --topic ep --asreview-pool data/asreview_pool_ep.csv
 ```
 
 *The exporter automatically queries PubMed E-utilities to retrieve abstracts for all records with PMIDs.*
@@ -53,7 +55,7 @@ $env:PYTHONPATH = "backend"
 Install ASReview in your environment and launch the browser interface:
 
 ```powershell
-.\.venv-new\Scripts\pip.exe install asreview
+.\.venv\Scripts\pip.exe install asreview
 asreview lab
 ```
 
@@ -61,46 +63,47 @@ Your default web browser will open `http://localhost:5000`.
 
 ---
 
-### Step 2.4: Configure the Screening Project in ASReview
-1. Click **Create Project** $\to$ Select **Oracle** (Interactive screening).
-2. **Dataset:** Upload `data/asreview_corpus_pool.csv`.
+### Step 2.4: Configure Screening Projects in ASReview (Two Separate Projects)
+Create two focused projects to prevent cross-domain vocabulary dilution:
+
+#### Project 1: Parkinson's Screening (`NeuroEvidence_Parkinsons`)
+1. **Dataset:** Upload `data/asreview_pool_pd.csv`.
+2. **AI Learner:** Select **ELAS u4** (Fast, lightweight TF-IDF learner).
 3. **Prior Knowledge (Warm-up):**
-   * Select **1 Relevant article** (e.g., a high-quality clinical review on Parkinson's motor symptoms or epilepsy classification).
-   * Select **1 Irrelevant article** (e.g., a pediatric animal model study or out-of-scope surgical technique).
-4. **Model Selection:**
-   * Feature extractor: **TF-IDF** (recommended for clinical abstracts)
-   * Classifier: **Naive Bayes** or **Logistic Regression**
-   * Query strategy: **Max** (certainty-based active learning)
-5. Click **Finish** and start screening.
+   * Label **1 Relevant** paper (e.g. `PD-001` or `PD-003`).
+   * Label **1 Irrelevant** paper (e.g. an animal study or out-of-scope paper).
+4. Review abstracts and export decisions to `data/asreview_export_pd.csv`.
+
+#### Project 2: Epilepsy Screening (`NeuroEvidence_Epilepsy`)
+1. **Dataset:** Upload `data/asreview_pool_ep.csv`.
+2. **AI Learner:** Select **ELAS u4**.
+3. **Prior Knowledge (Warm-up):**
+   * Label **1 Relevant** paper (e.g. `EP-001` or `EP-004`).
+   * Label **1 Irrelevant** paper.
+4. Review abstracts and export decisions to `data/asreview_export_ep.csv`.
 
 ---
 
 ### Step 2.5: Active Screening & Stopping Rule
 * For each presented paper, review the title and abstract.
 * Click **Relevant** (to include in the research corpus) or **Irrelevant** (to exclude).
-* **Stopping Rule:** In systematic review literature, screening can stop after **20–30 consecutive irrelevant records** appear, indicating that the vast majority of relevant papers in the pool have been identified.
+* **Stopping Rule:** Screening can conclude after **10–15 consecutive irrelevant records** appear, as the pool is compact (30 candidates per topic).
 
 ---
 
-### Step 2.6: Export Decisions from ASReview
-1. In ASReview LAB, navigate to the project dashboard.
-2. Click **Export Data** $\to$ choose **CSV format**.
-3. Save the exported file as `data/asreview_export.csv`.
-
----
-
-### Step 2.7: Synchronize Decisions into NeuroEvidence Manifest
-Run the automated synchronization command to update `data/corpus_manifest.csv`:
+### Step 2.6: Synchronize Decisions into NeuroEvidence Manifest
+Run the automated synchronization command to update `data/corpus_manifest.csv` for each completed export:
 
 ```powershell
 $env:PYTHONPATH = "backend"
-.\.venv\Scripts\python.exe -m app.ingestion sync-asreview `
-  --asreview-file data/asreview_export.csv `
-  --manifest data/corpus_manifest.csv `
-  --candidates data/corpus_candidates.csv
+# Sync Parkinson's decisions:
+python -m app.ingestion sync-asreview --asreview-file data/asreview_export_pd.csv
+
+# Sync Epilepsy decisions:
+python -m app.ingestion sync-asreview --asreview-file data/asreview_export_ep.csv
 ```
 
-The script identifies all records marked `included=1` and registers them in `data/corpus_manifest.csv` with `included=yes`.
+The script identifies all records marked `included=1` and registers them into `data/corpus_manifest.csv` with `included=yes`.
 
 ---
 

@@ -12,6 +12,15 @@ import httpx
 COMPARISON_CATEGORIES = {"answerable", "unanswerable"}
 
 
+def _resolve_project_path(p: Path) -> Path:
+    """Resolve a relative path against the project root if invoked from the backend subdirectory."""
+    if not p.is_absolute():
+        cwd = Path.cwd()
+        if cwd.name.lower() == "backend" and (cwd.parent / "data").exists():
+            return cwd.parent / p
+    return p
+
+
 def run(
     questions_path: Path,
     output_path: Path,
@@ -19,6 +28,10 @@ def run(
     api_url: str,
     split: str,
 ) -> None:
+    questions_path = _resolve_project_path(questions_path)
+    output_path = _resolve_project_path(output_path)
+    blind_path = _resolve_project_path(blind_path)
+
     with questions_path.open("r", encoding="utf-8-sig", newline="") as handle:
         questions = [row for row in csv.DictReader(handle) if row["split"] == split]
     if not questions:
@@ -61,7 +74,7 @@ def run(
                         "estimated_cost_usd": payload["estimated_cost_usd"],
                     }
                 )
-                print(f"{row['question_id']} {mode}")
+                print(f"{row['question_id']} {mode}", flush=True)
 
     output_path.write_text(
         "\n".join(json.dumps(item, ensure_ascii=False) for item in results),
@@ -103,8 +116,25 @@ def main() -> None:
     parser.add_argument("--blind-output", type=Path, default=Path("data/evaluation/blinded_review.csv"))
     parser.add_argument("--api-url", default="http://localhost:8000")
     parser.add_argument("--split", choices=["validation", "test"], default="validation")
+    parser.add_argument("--run-judge", action="store_true", help="Automatically run LLM-as-a-Judge on traces")
+    parser.add_argument("--judge-output", type=Path, default=Path("data/evaluation/judge_review.csv"), help="Path to judge CSV output")
+    parser.add_argument("--judge-summary", type=Path, default=Path("data/evaluation/judge_summary.json"), help="Path to judge summary JSON")
+    parser.add_argument("--judge-model", type=str, default=None, help="LLM model to use for the judge (e.g. gemini-2.5-pro)")
     args = parser.parse_args()
     run(args.questions, args.output, args.blind_output, args.api_url, args.split)
+
+    if args.run_judge:
+        from .evaluate_judge import format_comparison_table, run_judge
+
+        judged, metrics = run_judge(
+            args.output, args.judge_output, args.judge_summary, judge_model=args.judge_model
+        )
+        print("\n" + "=" * 60)
+        print("LLM-AS-A-JUDGE EVALUATION RESULTS")
+        print("=" * 60)
+        print(format_comparison_table(metrics))
+        print(f"\nJudge CSV saved to: {args.judge_output}")
+        print(f"Judge Summary saved to: {args.judge_summary}")
 
 
 if __name__ == "__main__":

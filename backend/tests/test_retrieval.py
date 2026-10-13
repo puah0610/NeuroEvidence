@@ -15,3 +15,16 @@ def test_get_source(settings) -> None:
     assert source is not None
     assert source.topic == "multiple sclerosis"
 
+
+def test_retrieval_prioritizes_medications_for_pharmacotherapy_query(settings) -> None:
+    retriever = DemoRetriever(settings)
+    query = "What kind of medication should I use to control parkinson disease and the reason behind it"
+    results = retriever.search(query, "Parkinson's disease")
+    assert len(results) >= 3
+
+    top_chunk_ids = [r.chunk_id for r in results[:3]]
+    # Must retrieve NICE NG71 First-Line Pharmacotherapy and Core Pharmacology
+    assert "TRIAD-PD-L2-02-firstline-1" in top_chunk_ids
+    assert "TRIAD-PD-L1-03-pharm-1" in top_chunk_ids
+
+

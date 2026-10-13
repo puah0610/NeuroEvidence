@@ -11,9 +11,12 @@ htmlcov/
 node_modules/
 frontend/dist/
 data/chroma/
+backend/data/
 data/app.db
 data/raw/
 *.log
 *.sqlite
+*.sqlite3
+*.db
 .DS_Store
 

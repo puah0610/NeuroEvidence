@@ -76,12 +76,12 @@ All chunks are pre-indexed and available immediately for both hybrid demo retrie
 If you wish to discover, screen, or index **additional** literature beyond the curated Triad knowledge base, use the built-in ingestion and active-learning toolchain:
 
 #### 1. Candidate Discovery
-Generate 30 recent PMC Open Access candidates per neurology topic:
+Generate recent PMC Open Access candidates (defaults to Parkinson's disease and epilepsy, avoiding duplicates and preserving existing candidates):
 ```powershell
 $env:PYTHONPATH = "backend"
-python -m app.ingestion discover
+python -m app.ingestion discover --per-topic 30
 ```
-This generates `data/corpus_candidates.csv` with candidates marked `included=no`.
+This updates `data/corpus_candidates.csv` (and creates a safety backup `.bak.csv`). You can customize topics using `--topics "Parkinson's disease,epilepsy"` (or `--topics all`), or pass `--overwrite` if you want a clean reset.
 
 #### 2. Active-Learning Screening with ASReview LAB
 To screen large batches of literature rapidly without manual review fatigue:
@@ -119,16 +119,30 @@ python -m app.ingestion index --manifest data/corpus_manifest.csv
 
 ### 1. End-to-end RAG vs baseline evaluation
 
-The evaluation template is in `data/evaluation_questions.csv`. Keep validation and final-test rows locked. Run the two modes with the same question set and model configuration, export traces from SQLite, blind the answers, and score them using the rubric in `docs/evaluation-protocol.md`.
+The evaluation template is in `data/evaluation_questions.csv`. Keep validation and final-test rows locked. Run the two modes with the same question set and model configuration (deterministic `temperature=0.0`), export traces from SQLite, blind the answers, and score them using the rubric in `docs/evaluation-protocol.md`.
 
-With the API running, execute the validation split first:
+With the API running, execute the validation split:
 
 ```powershell
 $env:PYTHONPATH = "backend"
 python -m app.evaluate --split validation
 ```
 
-After prompts and the evidence threshold are frozen, run `--split test`. The runner stores full JSONL traces and creates a separate CSV with mode labels removed for blinded review.
+To run end-to-end evaluation with automated **LLM-as-a-Judge** scoring (uses **`gemini-2.5-pro`** by default to evaluate Correctness, Hallucinations, Citation Precision, and Abstention):
+
+```powershell
+$env:PYTHONPATH = "backend"
+python -m app.evaluate --split validation --run-judge
+```
+
+Or run the judge independently on any previously generated trace file, optionally overriding the model:
+
+```powershell
+$env:PYTHONPATH = "backend"
+python -m app.evaluate_judge --traces data/evaluation/results.jsonl --output-csv data/evaluation/judged_review.csv --judge-model gemini-2.5-pro
+```
+
+After prompts and the evidence threshold are frozen, run `--split test`. The runner stores full JSONL traces, creates a separate CSV with mode labels removed for blinded review, and outputs comparative statistics.
 
 ### 2. Dual-track biomedical NLI benchmarking
 
@@ -137,6 +151,12 @@ Evaluate the NLI verifier against the external SciFact biomedical benchmark (Tra
 ```powershell
 $env:PYTHONPATH = "backend"
 python -m app.evaluate_nli --benchmark all --model pritamdeka/PubMedBERT-MNLI-MedNLI --compare-lexical
+```
+
+You can also test custom confidence and margin calibration thresholds:
+
+```powershell
+python -m app.evaluate_nli --benchmark all --model pritamdeka/PubMedBERT-MNLI-MedNLI --min-confidence 0.55 --min-margin 0.10
 ```
 
 Results, per-class F1, and confusion matrices are saved to `data/evaluation/nli_benchmark_results.json`.

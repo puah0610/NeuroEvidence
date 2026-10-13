@@ -80,12 +80,21 @@ async def evaluation_summary(request: Request) -> EvaluationSummary:
 @app.get("/api/health", response_model=HealthResponse)
 async def health(request: Request) -> HealthResponse:
     current = request.app.state.settings
+    if current.demo_mode:
+        gen_status = "demo"
+    elif current.gemini_enabled:
+        gen_status = "gemini:configured"
+    elif current.openai_enabled:
+        gen_status = "openai:configured"
+    else:
+        gen_status = "missing-key"
+
     return HealthResponse(
-        status="ok" if current.demo_mode or current.openai_enabled else "degraded",
+        status="ok" if current.demo_mode or current.active_llm_enabled else "degraded",
         demo_mode=current.demo_mode,
         database="sqlite:ready",
         vector_store="bundled-demo" if current.demo_mode else "chromadb:configured",
-        generation="demo" if current.demo_mode else ("openai:configured" if current.openai_enabled else "missing-key"),
+        generation=gen_status,
         nli="lexical-demo" if not current.enable_nli else current.nli_model,
     )
 

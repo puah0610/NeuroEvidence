@@ -8,7 +8,7 @@ async def test_verified_chat_returns_trace_and_citations(service, database) -> N
     response = await service.chat(
         ChatRequest(
             session_id="test-session",
-            question="How do ischemic and hemorrhagic stroke differ?",
+            question="What are the key movement features of Parkinson's disease?",
             mode=ChatMode.rag_verified,
         )
     )
@@ -24,7 +24,7 @@ async def test_baseline_has_no_verification(service) -> None:
     response = await service.chat(
         ChatRequest(
             session_id="test-session",
-            question="What is multiple sclerosis?",
+            question="What is Parkinson's disease?",
             mode=ChatMode.baseline,
         )
     )

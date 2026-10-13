@@ -1,49 +1,296 @@
 [
   {
     "benchmark_name": "scifact",
-    "model_name": "pritamdeka/PubMedBERT-MNLI-MedNLI",
+    "model_name": "lexical_baseline",
     "total_samples": 120,
-    "accuracy": 0.825,
-    "macro_f1": 0.8254,
-    "weighted_f1": 0.8254,
+    "accuracy": 0.4417,
+    "macro_f1": 0.3465,
+    "weighted_f1": 0.3465,
     "per_class": {
       "supported": {
-        "precision": 0.7727,
-        "recall": 0.85,
-        "f1": 0.8095,
+        "precision": 0.4074,
+        "recall": 0.275,
+        "f1": 0.3284,
         "support": 40
       },
       "contradicted": {
-        "precision": 0.8649,
-        "recall": 0.8,
-        "f1": 0.8312,
+        "precision": 0.5,
+        "recall": 0.05,
+        "f1": 0.0909,
         "support": 40
       },
       "insufficient": {
-        "precision": 0.8462,
-        "recall": 0.825,
-        "f1": 0.8354,
+        "precision": 0.4494,
+        "recall": 1.0,
+        "f1": 0.6202,
+        "support": 40
+      }
+    },
+    "confusion_matrix": {
+      "supported": {
+        "supported": 11,
+        "contradicted": 2,
+        "insufficient": 27
+      },
+      "contradicted": {
+        "supported": 16,
+        "contradicted": 2,
+        "insufficient": 22
+      },
+      "insufficient": {
+        "supported": 0,
+        "contradicted": 0,
+        "insufficient": 40
+      }
+    },
+    "average_latency_ms": 0.02,
+    "total_duration_seconds": 0.0,
+    "min_confidence": null,
+    "min_margin": null
+  },
+  {
+    "benchmark_name": "scifact",
+    "model_name": "pritamdeka/PubMedBERT-MNLI-MedNLI",
+    "total_samples": 120,
+    "accuracy": 0.8417,
+    "macro_f1": 0.8417,
+    "weighted_f1": 0.8417,
+    "per_class": {
+      "supported": {
+        "precision": 0.8293,
+        "recall": 0.85,
+        "f1": 0.8395,
+        "support": 40
+      },
+      "contradicted": {
+        "precision": 0.8889,
+        "recall": 0.8,
+        "f1": 0.8421,
+        "support": 40
+      },
+      "insufficient": {
+        "precision": 0.814,
+        "recall": 0.875,
+        "f1": 0.8434,
         "support": 40
       }
     },
     "confusion_matrix": {
       "supported": {
         "supported": 34,
-        "contradicted": 4,
-        "insufficient": 2
+        "contradicted": 3,
+        "insufficient": 3
       },
       "contradicted": {
-        "supported": 4,
+        "supported": 3,
         "contradicted": 32,
+        "insufficient": 5
+      },
+      "insufficient": {
+        "supported": 4,
+        "contradicted": 1,
+        "insufficient": 35
+      }
+    },
+    "average_latency_ms": 63.81,
+    "total_duration_seconds": 7.66,
+    "min_confidence": 0.55,
+    "min_margin": 0.1
+  },
+  {
+    "benchmark_name": "scifact",
+    "model_name": "cross-encoder/nli-deberta-v3-base",
+    "total_samples": 120,
+    "accuracy": 0.7583,
+    "macro_f1": 0.7508,
+    "weighted_f1": 0.7508,
+    "per_class": {
+      "supported": {
+        "precision": 0.9524,
+        "recall": 0.5,
+        "f1": 0.6557,
+        "support": 40
+      },
+      "contradicted": {
+        "precision": 0.8372,
+        "recall": 0.9,
+        "f1": 0.8675,
+        "support": 40
+      },
+      "insufficient": {
+        "precision": 0.625,
+        "recall": 0.875,
+        "f1": 0.7292,
+        "support": 40
+      }
+    },
+    "confusion_matrix": {
+      "supported": {
+        "supported": 20,
+        "contradicted": 3,
+        "insufficient": 17
+      },
+      "contradicted": {
+        "supported": 0,
+        "contradicted": 36,
         "insufficient": 4
       },
       "insufficient": {
-        "supported": 6,
-        "contradicted": 1,
-        "insufficient": 33
+        "supported": 1,
+        "contradicted": 4,
+        "insufficient": 35
       }
     },
-    "average_latency_ms": 50.28,
-    "total_duration_seconds": 6.03
+    "average_latency_ms": 137.23,
+    "total_duration_seconds": 16.47,
+    "min_confidence": 0.55,
+    "min_margin": 0.1
+  },
+  {
+    "benchmark_name": "neurology_domain",
+    "model_name": "lexical_baseline",
+    "total_samples": 120,
+    "accuracy": 0.5417,
+    "macro_f1": 0.4515,
+    "weighted_f1": 0.4515,
+    "per_class": {
+      "supported": {
+        "precision": 0.5319,
+        "recall": 0.625,
+        "f1": 0.5747,
+        "support": 40
+      },
+      "contradicted": {
+        "precision": 1.0,
+        "recall": 0.05,
+        "f1": 0.0952,
+        "support": 40
+      },
+      "insufficient": {
+        "precision": 0.5352,
+        "recall": 0.95,
+        "f1": 0.6847,
+        "support": 40
+      }
+    },
+    "confusion_matrix": {
+      "supported": {
+        "supported": 25,
+        "contradicted": 0,
+        "insufficient": 15
+      },
+      "contradicted": {
+        "supported": 20,
+        "contradicted": 2,
+        "insufficient": 18
+      },
+      "insufficient": {
+        "supported": 2,
+        "contradicted": 0,
+        "insufficient": 38
+      }
+    },
+    "average_latency_ms": 0.03,
+    "total_duration_seconds": 0.0,
+    "min_confidence": null,
+    "min_margin": null
+  },
+  {
+    "benchmark_name": "neurology_domain",
+    "model_name": "pritamdeka/PubMedBERT-MNLI-MedNLI",
+    "total_samples": 120,
+    "accuracy": 0.8167,
+    "macro_f1": 0.8096,
+    "weighted_f1": 0.8096,
+    "per_class": {
+      "supported": {
+        "precision": 0.8409,
+        "recall": 0.925,
+        "f1": 0.881,
+        "support": 40
+      },
+      "contradicted": {
+        "precision": 0.7551,
+        "recall": 0.925,
+        "f1": 0.8315,
+        "support": 40
+      },
+      "insufficient": {
+        "precision": 0.8889,
+        "recall": 0.6,
+        "f1": 0.7164,
+        "support": 40
+      }
+    },
+    "confusion_matrix": {
+      "supported": {
+        "supported": 37,
+        "contradicted": 3,
+        "insufficient": 0
+      },
+      "contradicted": {
+        "supported": 0,
+        "contradicted": 37,
+        "insufficient": 3
+      },
+      "insufficient": {
+        "supported": 7,
+        "contradicted": 9,
+        "insufficient": 24
+      }
+    },
+    "average_latency_ms": 63.87,
+    "total_duration_seconds": 7.67,
+    "min_confidence": 0.55,
+    "min_margin": 0.1
+  },
+  {
+    "benchmark_name": "neurology_domain",
+    "model_name": "cross-encoder/nli-deberta-v3-base",
+    "total_samples": 120,
+    "accuracy": 0.9083,
+    "macro_f1": 0.9091,
+    "weighted_f1": 0.9091,
+    "per_class": {
+      "supported": {
+        "precision": 0.973,
+        "recall": 0.9,
+        "f1": 0.9351,
+        "support": 40
+      },
+      "contradicted": {
+        "precision": 0.9231,
+        "recall": 0.9,
+        "f1": 0.9114,
+        "support": 40
+      },
+      "insufficient": {
+        "precision": 0.8409,
+        "recall": 0.925,
+        "f1": 0.881,
+        "support": 40
+      }
+    },
+    "confusion_matrix": {
+      "supported": {
+        "supported": 36,
+        "contradicted": 0,
+        "insufficient": 4
+      },
+      "contradicted": {
+        "supported": 1,
+        "contradicted": 36,
+        "insufficient": 3
+      },
+      "insufficient": {
+        "supported": 0,
+        "contradicted": 3,
+        "insufficient": 37
+      }
+    },
+    "average_latency_ms": 150.33,
+    "total_duration_seconds": 18.04,
+    "min_confidence": 0.55,
+    "min_margin": 0.1
   }
 ]

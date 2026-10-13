@@ -40,9 +40,21 @@ class BenchmarkReport:
     confusion_matrix: dict[str, dict[str, int]]
     average_latency_ms: float
     total_duration_seconds: float
+    min_confidence: float | None = None
+    min_margin: float | None = None
+
+
+def _resolve_project_path(p: Path) -> Path:
+    """Resolve a relative path against the project root if invoked from the backend subdirectory."""
+    if not p.is_absolute():
+        cwd = Path.cwd()
+        if cwd.name.lower() == "backend" and (cwd.parent / "data").exists():
+            return cwd.parent / p
+    return p
 
 
 def load_dataset(path: Path) -> list[dict[str, str]]:
+    path = _resolve_project_path(path)
     if not path.exists():
         raise FileNotFoundError(f"Benchmark file not found: {path}")
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -127,6 +139,9 @@ def evaluate_model(
     )
     avg_latency = round(sum(latencies) / len(latencies), 2)
 
+    min_conf = getattr(verifier, "min_confidence", None)
+    min_marg = getattr(verifier, "min_margin", None)
+
     return BenchmarkReport(
         benchmark_name=benchmark_name,
         model_name=model_name,
@@ -138,12 +153,16 @@ def evaluate_model(
         confusion_matrix=matrix,
         average_latency_ms=avg_latency,
         total_duration_seconds=round(total_duration, 2),
+        min_confidence=min_conf,
+        min_margin=min_marg,
     )
 
 
 def print_report(report: BenchmarkReport) -> None:
     print("=" * 72)
     print(f"BENCHMARK: {report.benchmark_name.upper()} | MODEL: {report.model_name}")
+    if report.min_confidence is not None or report.min_margin is not None:
+        print(f"Calibration:      min_confidence={report.min_confidence}, min_margin={report.min_margin}")
     print("=" * 72)
     print(f"Total Evaluated: {report.total_samples}")
     print(f"Overall Accuracy: {report.accuracy * 100:.2f}%")
@@ -212,6 +231,8 @@ def run_benchmarks(
     neurology_path: Path,
     output_path: Path,
     compare_lexical: bool = False,
+    min_confidence: float | None = None,
+    min_margin: float | None = None,
 ) -> list[BenchmarkReport]:
     benchmarks_to_run: list[tuple[str, Path]] = []
     if benchmark_choice in {"scifact", "all"}:
@@ -221,12 +242,20 @@ def run_benchmarks(
 
     # Initialize models
     verifiers: list[tuple[str, NLIVerifier]] = []
-    if compare_lexical or model_name.lower() == "lexical":
+    models = [m.strip() for m in model_name.split(",") if m.strip()]
+    if compare_lexical or any(m.lower() == "lexical" for m in models):
         verifiers.append(("lexical_baseline", LexicalNLIVerifier()))
 
-    if model_name.lower() != "lexical":
-        print(f"Loading transformer NLI verifier: {model_name}...")
-        verifiers.append((model_name, TransformerNLIVerifier(model_name)))
+    for m in models:
+        if m.lower() == "lexical":
+            continue
+        print(f"Loading transformer NLI verifier: {m}...")
+        kwargs = {}
+        if min_confidence is not None:
+            kwargs["min_confidence"] = min_confidence
+        if min_margin is not None:
+            kwargs["min_margin"] = min_margin
+        verifiers.append((m, TransformerNLIVerifier(m, **kwargs)))
 
     all_reports: list[BenchmarkReport] = []
     for bench_name, path in benchmarks_to_run:
@@ -238,6 +267,7 @@ def run_benchmarks(
             all_reports.append(report)
 
     # Save results to JSON
+    output_path = _resolve_project_path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     report_dicts = [asdict(r) for r in all_reports]
     output_path.write_text(json.dumps(report_dicts, indent=2), encoding="utf-8")
@@ -280,6 +310,18 @@ def main() -> None:
         action="store_true",
         help="Run lexical baseline verifier in parallel for comparison",
     )
+    parser.add_argument(
+        "--min-confidence",
+        type=float,
+        default=settings.nli_min_confidence,
+        help=f"Minimum confidence threshold for Supported/Contradicted (default: {settings.nli_min_confidence})",
+    )
+    parser.add_argument(
+        "--min-margin",
+        type=float,
+        default=settings.nli_min_margin,
+        help=f"Minimum probability margin between top-1 and top-2 (default: {settings.nli_min_margin})",
+    )
     args = parser.parse_args()
 
     run_benchmarks(
@@ -289,6 +331,8 @@ def main() -> None:
         neurology_path=args.neurology_path,
         output_path=args.output,
         compare_lexical=args.compare_lexical,
+        min_confidence=args.min_confidence,
+        min_margin=args.min_margin,
     )
 
 

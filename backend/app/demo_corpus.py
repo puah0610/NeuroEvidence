@@ -219,7 +219,7 @@ DEMO_CHUNKS = [
         year=2024,
         journal="StatPearls [Internet] / NCBI Bookshelf",
         topic="epilepsy",
-        url="https://www.ncbi.nlm.nih.gov/books/NBK430732/",
+        url="https://www.ncbi.nlm.nih.gov/books/NBK430765/",
         license="NCBI Bookshelf / StatPearls Open Access educational reference",
         section="ILAE Classification",
         excerpt=(
@@ -247,7 +247,7 @@ DEMO_CHUNKS = [
         year=2024,
         journal="StatPearls [Internet] / NCBI Bookshelf",
         topic="epilepsy",
-        url="https://www.ncbi.nlm.nih.gov/books/NBK441860/",
+        url="https://www.ncbi.nlm.nih.gov/books/NBK500005/",
         license="NCBI Bookshelf / StatPearls Open Access educational reference",
         section="Pathophysiology and Semiology",
         excerpt=(
@@ -275,7 +275,7 @@ DEMO_CHUNKS = [
         year=2024,
         journal="StatPearls [Internet] / NCBI Bookshelf",
         topic="epilepsy",
-        url="https://www.ncbi.nlm.nih.gov/books/NBK537024/",
+        url="https://www.ncbi.nlm.nih.gov/books/NBK482269/",
         license="NCBI Bookshelf / StatPearls Open Access educational reference",
         section="Drug Mechanisms",
         excerpt=(
@@ -304,7 +304,7 @@ DEMO_CHUNKS = [
         year=2024,
         journal="StatPearls [Internet] / NCBI Bookshelf",
         topic="Parkinson's disease",
-        url="https://www.ncbi.nlm.nih.gov/books/NBK536965/",
+        url="https://www.ncbi.nlm.nih.gov/books/NBK470193/",
         license="NCBI Bookshelf / StatPearls Open Access educational reference",
         section="Pathophysiology",
         excerpt=(
@@ -332,7 +332,7 @@ DEMO_CHUNKS = [
         year=2024,
         journal="StatPearls [Internet] / NCBI Bookshelf",
         topic="Parkinson's disease",
-        url="https://www.ncbi.nlm.nih.gov/books/NBK448191/",
+        url="https://www.ncbi.nlm.nih.gov/books/NBK470193/",
         license="NCBI Bookshelf / StatPearls Open Access educational reference",
         section="Clinical Staging",
         excerpt=(
@@ -361,7 +361,7 @@ DEMO_CHUNKS = [
         year=2024,
         journal="StatPearls [Internet] / NCBI Bookshelf",
         topic="Parkinson's disease",
-        url="https://www.ncbi.nlm.nih.gov/books/NBK553142/",
+        url="https://www.ncbi.nlm.nih.gov/books/NBK482140/",
         license="NCBI Bookshelf / StatPearls Open Access educational reference",
         section="Core Pharmacology",
         excerpt=(
@@ -467,6 +467,33 @@ DEMO_CHUNKS = [
         layer_source="NICE Guidelines",
         subtopic="NICE NG217",
     ),
+    # --- Epilepsy: NICE NG217 Antiseizure Polytherapy & Drug Interactions ---
+    RetrievedChunk(
+        source_id="TRIAD-EP-L2-04",
+        chunk_id="TRIAD-EP-L2-04-interactions-1",
+        document_id="TRIAD-EP-L2-04",
+        title="NICE NG217: Antiseizure Polytherapy and Pharmacological Interactions",
+        authors=["National Institute for Health and Care Excellence"],
+        year=2022,
+        journal="NICE Guideline [NG217]",
+        topic="epilepsy",
+        url="https://www.nice.org.uk/guidance/ng217",
+        license="Crown copyright / Open Government Licence (UK NICE)",
+        section="Drug Interactions and Polytherapy",
+        excerpt=(
+            "When prescribing combination antiseizure medication (polytherapy), clinicians must evaluate pharmacokinetic interactions: "
+            "1) Sodium valproate markedly inhibits UGT2B7 glucuronidation of lamotrigine, doubling lamotrigine half-life and sharply "
+            "increasing Stevens-Johnson syndrome (SJS) risk; lamotrigine starting dose must be halved (e.g. 25 mg every other day) with slow titration. "
+            "2) Enzyme-inducing ASMs (carbamazepine, phenytoin) accelerate lamotrigine and oral contraceptive clearance, risking seizure recurrence "
+            "or contraceptive failure. 3) Non-enzyme-inducing ASMs like levetiracetam have minimal hepatic CYP interactions."
+        ),
+        relevance=0.0,
+        demo=True,
+        layer=2,
+        layer_name="Layer 2: Clinical Guidelines & Consensus",
+        layer_source="NICE Guidelines",
+        subtopic="NICE NG217",
+    ),
     # --- Parkinson's: NICE NG71 Diagnosis & Specialist Care ---
     RetrievedChunk(
         source_id="TRIAD-PD-L2-01",
@@ -549,6 +576,34 @@ DEMO_CHUNKS = [
         layer_source="NICE Guidelines",
         subtopic="NICE NG71",
     ),
+    # --- Parkinson's: NICE NG71 Drug Interactions & Antiemetic Safety ---
+    RetrievedChunk(
+        source_id="TRIAD-PD-L2-04",
+        chunk_id="TRIAD-PD-L2-04-interactions-1",
+        document_id="TRIAD-PD-L2-04",
+        title="NICE NG71: Pharmacological Interactions, Antiemetics, and Polypharmacy",
+        authors=["National Institute for Health and Care Excellence"],
+        year=2017,
+        journal="NICE Guideline [NG71]",
+        topic="Parkinson's disease",
+        url="https://www.nice.org.uk/guidance/ng71",
+        license="Crown copyright / Open Government Licence (UK NICE)",
+        section="Drug Interactions and Contraindications",
+        excerpt=(
+            "NICE NG71 highlights critical pharmacological safety warnings in Parkinson's disease: "
+            "1) Centrally acting dopamine D2 receptor antagonists (metoclopramide, prochlorperazine, and typical antipsychotics like haloperidol) "
+            "are strictly contraindicated as they cross the blood-brain barrier, acutely block striatal receptors, and provoke severe parkinsonian crisis. "
+            "Domperidone (with cardiac ECG QTc monitoring) is the preferred peripheral antiemetic. "
+            "2) Oral iron supplements chelate levodopa in the gastrointestinal tract; doses should be separated by at least 2 to 3 hours. "
+            "3) When adding MAO-B or COMT inhibitors to levodopa, reduce levodopa doses if peak-dose dyskinesia develops."
+        ),
+        relevance=0.0,
+        demo=True,
+        layer=2,
+        layer_name="Layer 2: Clinical Guidelines & Consensus",
+        layer_source="NICE Guidelines",
+        subtopic="NICE NG71",
+    ),
 
     # =========================================================================
     # LAYER 3: EMPIRICAL EVIDENCE & TRIALS (PubMed Central / Cochrane)
@@ -561,12 +616,12 @@ DEMO_CHUNKS = [
         title="SANAD II: Levetiracetam vs Sodium Valproate in Generalized and Unclassifiable Epilepsy (RCT)",
         authors=["Marson A", "Burnside G", "Appleton R", "Smith D", "Leach JP", "Sills GJ", "et al."],
         year=2021,
-        journal="The Lancet / PMC8208882",
+        journal="The Lancet / PMC8047813",
         topic="epilepsy",
-        url="https://pmc.ncbi.nlm.nih.gov/articles/PMC8208882/",
-        doi="10.1016/S0140-6736(21)00247-6",
-        pmid="33838743",
-        pmcid="PMC8208882",
+        url="https://pmc.ncbi.nlm.nih.gov/articles/PMC8047813/",
+        doi="10.1016/S0140-6736(21)00246-4",
+        pmid="33838758",
+        pmcid="PMC8047813",
         license="CC BY 4.0 Open Access",
         section="Comparative RCT Results",
         excerpt=(
@@ -592,12 +647,12 @@ DEMO_CHUNKS = [
         title="SANAD II: Levetiracetam vs Lamotrigine in Newly Diagnosed Focal Epilepsy (RCT)",
         authors=["Marson A", "Burnside G", "Appleton R", "Smith D", "Leach JP", "Sills GJ", "et al."],
         year=2021,
-        journal="The Lancet / PMC8208883",
+        journal="The Lancet / PMC8047799",
         topic="epilepsy",
-        url="https://pmc.ncbi.nlm.nih.gov/articles/PMC8208883/",
-        doi="10.1016/S0140-6736(21)00246-4",
-        pmid="33838744",
-        pmcid="PMC8208883",
+        url="https://pmc.ncbi.nlm.nih.gov/articles/PMC8047799/",
+        doi="10.1016/S0140-6736(21)00247-6",
+        pmid="33838757",
+        pmcid="PMC8047799",
         license="CC BY 4.0 Open Access",
         section="Comparative RCT Results",
         excerpt=(
@@ -679,3 +734,15 @@ DEMO_CHUNKS = [
         subtopic="MAO-B vs COMT Meta-Analysis",
     ),
 ]
+
+# Initialize hierarchical parent-child relationships and breadcrumbs across the knowledge base
+for chunk in DEMO_CHUNKS:
+    if not chunk.breadcrumb:
+        layer_label = f"Layer {chunk.layer}"
+        sub_name = chunk.subtopic or chunk.section or "Clinical Principles"
+        chunk.breadcrumb = [layer_label, chunk.topic.title(), sub_name, chunk.title]
+    if not chunk.parent_id:
+        chunk.parent_id = f"{chunk.document_id}::{chunk.section or 'main'}"
+    if not chunk.parent_title:
+        chunk.parent_title = f"{chunk.title} - {chunk.section or chunk.subtopic or 'Full Section'}"
+
