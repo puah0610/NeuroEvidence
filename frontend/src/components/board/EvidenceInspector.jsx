@@ -115,6 +115,86 @@ export default function EvidenceInspector({
           </div>
         )}
 
+        {/* Bounded Answer Revision Trace */}
+        {result.original_answer && (
+          <div className="rounded-2xl border border-sky-200/80 bg-sky-50/50 p-4 text-xs shadow-2xs">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2 font-bold text-sky-950">
+                <ShieldCheck size={16} className="text-sky-700" />
+                <span>Bounded Answer Revision Audit</span>
+              </div>
+              <span className="rounded-full bg-sky-100 border border-sky-200 px-2 py-0.5 text-[10px] font-bold text-sky-800">
+                Draft Revised via NLI Feedback
+              </span>
+            </div>
+            <p className="text-sky-900/80 leading-relaxed mb-3">
+              The initial model draft contained unsupported claims or misattributed citations. The pipeline performed targeted secondary retrieval and updated the inline citations and claims to match the verified evidence.
+            </p>
+            <details className="text-xs">
+              <summary className="cursor-pointer font-semibold text-sky-900 hover:text-sky-700 select-none">
+                Inspect Initial Pre-Revision Draft (Research Trace) ▸
+              </summary>
+              <div className="mt-2.5 rounded-xl border border-neutral-200 bg-white p-3 font-mono text-[11px] text-neutral-600 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+                {result.original_answer}
+              </div>
+            </details>
+          </div>
+        )}
+
+        {/* Selective Query Decomposition Audit */}
+        {result.subqueries && result.subqueries.length > 1 && (
+          <div className="rounded-2xl border border-violet-200/80 bg-violet-50/50 p-4 text-xs shadow-2xs">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 font-bold text-violet-950">
+                <Layers size={16} className="text-violet-700" />
+                <span>Selective Query Decomposition Audit ({result.subqueries.length} Subqueries)</span>
+              </div>
+              <span className="rounded-full bg-violet-100 border border-violet-200 px-2 py-0.5 text-[10px] font-bold text-violet-800">
+                Triad-Aligned Partitioning
+              </span>
+            </div>
+            <p className="text-violet-900/80 leading-relaxed mb-3">
+              The compound inquiry was decomposed into distinct subqueries preserving clinical constraints, retrieved across Triad layers, and deduplicated:
+            </p>
+            <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+              {result.subqueries.map((sq, i) => (
+                <div key={sq.subquery_id || i} className="rounded-xl border border-neutral-200/80 bg-white p-3 shadow-2xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="font-mono text-[10px] font-bold text-violet-800 bg-violet-50 px-1.5 py-0.5 rounded border border-violet-200">
+                      {sq.subquery_id}
+                    </span>
+                    {sq.has_evidence ? (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        {sq.chunks_found} chunks found
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                        Evidence Gap
+                      </span>
+                    )}
+                  </div>
+                  <p className="font-semibold text-neutral-800 text-xs mb-1">
+                    "{sq.query_text}"
+                  </p>
+                  <p className="text-[10px] text-neutral-500">
+                    <strong>Intent:</strong> {sq.intent_description}
+                  </p>
+                  {sq.target_layer_name && (
+                    <p className="text-[10px] text-indigo-700 mt-1">
+                      <strong>Target:</strong> {sq.target_layer_name}
+                    </p>
+                  )}
+                  {!sq.has_evidence && sq.missing_evidence_statement && (
+                    <p className="mt-2 text-[10px] font-medium text-amber-900 bg-amber-50 p-1.5 rounded border border-amber-200">
+                      {sq.missing_evidence_statement}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Claim-Level Entailment Section */}
         {result.claim_checks && result.claim_checks.length > 0 && (
           <section className="space-y-3">

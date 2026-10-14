@@ -14,6 +14,12 @@ def settings(tmp_path: Path) -> Settings:
         database_path=tmp_path / "test.db",
         chroma_path=tmp_path / "chroma",
         evidence_threshold=0.65,
+        enable_dense_embeddings=False,
+        enable_reranker=False,
+        enable_hyde=False,
+        enable_nli=False,
+        gemini_api_key="",
+        openai_api_key="",
     )
 
 

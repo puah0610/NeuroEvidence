@@ -58,6 +58,10 @@ class Database:
                 );
                 """
             )
+            try:
+                connection.execute("ALTER TABLE traces ADD COLUMN subqueries_json TEXT")
+            except sqlite3.OperationalError:
+                pass
 
     def save_trace(self, session_id: str, question: str, result: ChatResponse) -> None:
         with self._lock, self._connect() as connection:
@@ -65,9 +69,9 @@ class Database:
                 """
                 INSERT OR REPLACE INTO traces(
                     trace_id, session_id, question, mode, intent, answer, original_answer,
-                    citations_json, claim_checks_json, evidence_score, latency_ms, model,
+                    citations_json, claim_checks_json, subqueries_json, evidence_score, latency_ms, model,
                     input_tokens, output_tokens, estimated_cost_usd, demo_mode, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     result.trace_id,
@@ -79,6 +83,7 @@ class Database:
                     result.original_answer,
                     json.dumps([item.model_dump(mode="json") for item in result.citations]),
                     json.dumps([item.model_dump(mode="json") for item in result.claim_checks]),
+                    json.dumps([item.model_dump(mode="json") for item in result.subqueries]),
                     result.evidence_score,
                     result.latency_ms,
                     result.model,

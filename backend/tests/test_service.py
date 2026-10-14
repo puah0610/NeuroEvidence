@@ -46,3 +46,20 @@ async def test_emergency_is_redirected(service) -> None:
     assert "emergency" in response.answer.lower()
     assert response.citations == []
 
+
+@pytest.mark.asyncio
+async def test_bounded_answer_revision_workflow(service, database) -> None:
+    request = ChatRequest(
+        session_id="test-revision-session",
+        question="What are the diagnostic features and pharmacotherapy for focal seizures?",
+        mode=ChatMode.rag_verified,
+    )
+    response = await service.chat(request)
+    assert response.mode == ChatMode.rag_verified
+    assert response.citations
+    assert response.claim_checks
+    if response.original_answer is not None:
+        assert response.answer != response.original_answer
+        assert len(response.original_answer) > 0
+    assert database.summary().total_traces >= 1
+

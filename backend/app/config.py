@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     llm_provider: str = "gemini"
     gemini_api_key: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
-    gemini_generation_model: str = "gemini-3.6-flash"
+    gemini_generation_model: str = "gemini-3.8-flash"
     gemini_judge_model: str = "gemini-2.5-pro"
     gemini_embedding_model: str = "gemini-embedding-001"
     gemini_input_cost_per_million: float = Field(default=0.0, ge=0)
@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     reranker_top_n: int = Field(default=20, ge=5, le=50)
     enable_hyde: bool = True
     hyde_max_tokens: int = Field(default=150, ge=30, le=500)
+    parent_expansion_token_budget: int = Field(default=750, ge=200, le=2500)
+    enable_bounded_answer_revision: bool = Field(default=True)
+    enable_query_decomposition: bool = Field(default=True)
+    max_decomposition_subqueries: int = Field(default=3, ge=2, le=5)
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"), env_file_encoding="utf-8", extra="ignore"

@@ -518,3 +518,48 @@ def _is_nonfactual_notice(claim: str) -> bool:
     if claim.startswith(("#", "###", "####")) or (claim.startswith("**") and claim.endswith((":**", "**"))):
         return True
     return False
+
+
+def sync_answer_citations(answer: str, claims: list[ClaimCheck]) -> str:
+    """Updates inline citations in the answer text to reflect verified/re-attributed source markers.
+    For instance, if a claim was supported via secondary retrieval by [S5] (originally citing [S1] or uncited),
+    this updates the sentence's inline bracket to [S5].
+    """
+    if not answer or not claims:
+        return answer
+
+    revised_text = answer
+    for claim in claims:
+        if claim.label != VerificationLabel.supported or not claim.citation_markers:
+            continue
+
+        target_markers_str = f"[{', '.join(claim.citation_markers)}]"
+        claim_sub = claim.claim.strip()
+        if len(claim_sub) < 8:
+            continue
+
+        lines = revised_text.split("\n")
+        new_lines = []
+        for line in lines:
+            if claim_sub in line:
+                already_has_marker = any(
+                    re.search(rf"\[\s*{re.escape(m)}\b", line) for m in claim.citation_markers
+                )
+                if not already_has_marker:
+                    bracket_match = CITATION_BRACKET_PATTERN.search(line)
+                    if bracket_match:
+                        line = (
+                            line[:bracket_match.start()]
+                            + target_markers_str
+                            + line[bracket_match.end():]
+                        )
+                    else:
+                        line = line.rstrip()
+                        if line.endswith((".", ";", ":")):
+                            line = line[:-1] + f" {target_markers_str}."
+                        else:
+                            line = f"{line} {target_markers_str}"
+            new_lines.append(line)
+        revised_text = "\n".join(new_lines)
+
+    return revised_text

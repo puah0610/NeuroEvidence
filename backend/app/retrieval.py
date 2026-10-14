@@ -2,7 +2,7 @@ import logging
 import math
 import re
 from collections import Counter, defaultdict
-from typing import Protocol, Any
+from typing import Protocol, Any, Callable
 
 from .config import Settings
 from .demo_corpus import DEMO_CHUNKS
@@ -347,7 +347,16 @@ class DemoRetriever:
             reranked,
             self.settings.retrieval_top_k,
             self.settings.max_chunks_per_document,
+            corpus_lookup=self._demo_parent_lookup,
+            token_budget=getattr(self.settings, "parent_expansion_token_budget", 750),
         )
+
+    def _demo_parent_lookup(self, target_chunk: RetrievedChunk) -> list[RetrievedChunk]:
+        pid = target_chunk.parent_id or f"{target_chunk.document_id}::{target_chunk.section or 'main'}"
+        return [
+            c for c in DEMO_CHUNKS
+            if (c.parent_id == pid or (c.document_id == target_chunk.document_id and c.section == target_chunk.section))
+        ]
 
     def get_source(self, source_id: str) -> RetrievedChunk | None:
         return next((item for item in DEMO_CHUNKS if item.source_id == source_id), None)
@@ -358,6 +367,7 @@ class ChromaRetriever:
 
     def __init__(self, settings: Settings, embedder: Embedder):
         import chromadb
+        from chromadb.config import Settings as ChromaSettings
 
         self.settings = settings
         self.embedder = embedder
@@ -366,7 +376,10 @@ class ChromaRetriever:
             if getattr(settings, "enable_hyde", True)
             else None
         )
-        self.client = chromadb.PersistentClient(path=str(settings.chroma_path))
+        self.client = chromadb.PersistentClient(
+            path=str(settings.chroma_path),
+            settings=ChromaSettings(anonymized_telemetry=False),
+        )
         self.collection = self.client.get_or_create_collection(
             name=settings.chroma_collection,
             metadata={"hnsw:space": "cosine"},
@@ -445,9 +458,33 @@ class ChromaRetriever:
             reranked = candidate_pool
 
         parent_expanded = expand_to_parent_chunks(
-            reranked, self.settings.retrieval_top_k, self.settings.max_chunks_per_document
+            reranked,
+            self.settings.retrieval_top_k,
+            self.settings.max_chunks_per_document,
+            corpus_lookup=self._chroma_parent_lookup,
+            token_budget=getattr(self.settings, "parent_expansion_token_budget", 750),
         )
         return parent_expanded if parent_expanded else DemoRetriever(self.settings).search(question, topic)
+
+    def _chroma_parent_lookup(self, target_chunk: RetrievedChunk) -> list[RetrievedChunk]:
+        pid = target_chunk.parent_id or f"{target_chunk.document_id}::{target_chunk.section or 'main'}"
+        if self.collection.count() > 0:
+            try:
+                res = self.collection.get(
+                    where={"parent_id": pid},
+                    include=["documents", "metadatas"],
+                )
+                if res["ids"]:
+                    return [
+                        _build_chunk(cid, doc, meta, 0.0)
+                        for cid, doc, meta in zip(res["ids"], res["documents"], res["metadatas"])
+                    ]
+            except Exception as e:
+                logger.debug("ChromaDB parent lookup error: %s", e)
+        return [
+            c for c in DEMO_CHUNKS
+            if (c.parent_id == pid or (c.document_id == target_chunk.document_id and c.section == target_chunk.section))
+        ]
 
     def get_source(self, source_id: str) -> RetrievedChunk | None:
         if self.collection.count() > 0:
@@ -460,14 +497,101 @@ class ChromaRetriever:
         return next((item for item in DEMO_CHUNKS if item.source_id == source_id), None)
 
 
+def _estimate_tokens(text: str) -> int:
+    return len(re.findall(r"\S+", text))
+
+
+def _assemble_bounded_parent_excerpt(
+    target_chunk: RetrievedChunk,
+    siblings: list[RetrievedChunk],
+    token_budget: int = 750,
+) -> str:
+    """Assembles a bounded parent section around target_chunk using siblings up to token_budget.
+    Recovers preceding definitions/qualifications and following study context without overwhelming context.
+    """
+    if not siblings:
+        return target_chunk.excerpt
+
+    def _clean_txt(item: RetrievedChunk) -> str:
+        txt = item.excerpt.strip()
+        if txt.startswith("### ["):
+            parts = txt.split("\n\n", 1)
+            if len(parts) > 1:
+                txt = parts[1].strip()
+        return txt
+
+    if len(siblings) == 1:
+        return _clean_txt(siblings[0])
+
+    clean_siblings = [(s, _clean_txt(s)) for s in siblings]
+
+    target_idx = -1
+    for i, (s, _) in enumerate(clean_siblings):
+        if s.chunk_id == target_chunk.chunk_id:
+            target_idx = i
+            break
+
+    if target_idx == -1:
+        target_raw = _clean_txt(target_chunk)
+        for i, (_, txt) in enumerate(clean_siblings):
+            if target_raw in txt or txt in target_raw:
+                target_idx = i
+                break
+
+    if target_idx == -1:
+        assembled = [_clean_txt(target_chunk)]
+        curr_tokens = _estimate_tokens(assembled[0])
+        for _, txt in clean_siblings:
+            tokens = _estimate_tokens(txt)
+            if txt not in assembled[0] and (curr_tokens + tokens) <= token_budget:
+                assembled.append(txt)
+                curr_tokens += tokens
+        return "\n\n".join(assembled)
+
+    selected_indices = [target_idx]
+    curr_tokens = _estimate_tokens(clean_siblings[target_idx][1])
+    left_ptr = target_idx - 1
+    right_ptr = target_idx + 1
+
+    while (left_ptr >= 0 or right_ptr < len(clean_siblings)) and curr_tokens < token_budget:
+        if left_ptr >= 0:
+            left_txt = clean_siblings[left_ptr][1]
+            left_tok = _estimate_tokens(left_txt)
+            if curr_tokens + left_tok <= token_budget:
+                selected_indices.insert(0, left_ptr)
+                curr_tokens += left_tok
+                left_ptr -= 1
+            else:
+                left_ptr = -1
+
+        if right_ptr < len(clean_siblings):
+            right_txt = clean_siblings[right_ptr][1]
+            right_tok = _estimate_tokens(right_txt)
+            if curr_tokens + right_tok <= token_budget:
+                selected_indices.append(right_ptr)
+                curr_tokens += right_tok
+                right_ptr += 1
+            else:
+                right_ptr = len(clean_siblings)
+
+        if left_ptr < 0 and right_ptr >= len(clean_siblings):
+            break
+
+    assembled_parts = [clean_siblings[i][1] for i in selected_indices if clean_siblings[i][1]]
+    return "\n\n".join(assembled_parts)
+
+
 def expand_to_parent_chunks(
     fused: list[RetrievedChunk],
     top_k: int,
     max_per_document: int = 3,
+    corpus_lookup: Callable[[RetrievedChunk], list[RetrievedChunk]] | None = None,
+    token_budget: int = 750,
 ) -> list[RetrievedChunk]:
     """Hierarchical Small-to-Big expansion:
     Maps matched child chunks to their direct Parent Section context with breadcrumbs,
-    deduplicating sections and consolidating multi-chunk matches from the same parent.
+    fetching neighboring sibling chunks within a token budget to recover omitted definitions
+    and study qualifications, while consolidating multi-chunk matches from the same parent.
     """
     seen_parents: dict[str, RetrievedChunk] = {}
     doc_counts: defaultdict[str, int] = defaultdict(int)
@@ -480,11 +604,22 @@ def expand_to_parent_chunks(
                 continue
 
             breadcrumb_str = " > ".join(chunk.breadcrumb) if chunk.breadcrumb else chunk.title
+
+            if corpus_lookup is not None:
+                try:
+                    siblings = corpus_lookup(chunk)
+                except Exception as e:
+                    logger.debug("Corpus lookup failed for chunk %s: %s", chunk.chunk_id, e)
+                    siblings = [chunk]
+                assembled_excerpt = _assemble_bounded_parent_excerpt(chunk, siblings, token_budget=token_budget)
+            else:
+                assembled_excerpt = chunk.excerpt
+
             parent_excerpt = (
                 f"### [{breadcrumb_str}]\n"
                 f"**Document:** {chunk.title}\n"
                 f"**Section:** {chunk.section or chunk.subtopic or 'Clinical Guidance'}\n\n"
-                f"{chunk.excerpt}"
+                f"{assembled_excerpt}"
             )
             parent_chunk = chunk.model_copy(update={
                 "excerpt": parent_excerpt,
@@ -496,8 +631,14 @@ def expand_to_parent_chunks(
             doc_counts[chunk.document_id] += 1
         else:
             existing = seen_parents[pid]
-            if chunk.excerpt not in existing.excerpt:
-                existing.excerpt = f"{existing.excerpt}\n\n{chunk.excerpt}"
+            clean_chunk_excerpt = chunk.excerpt
+            if clean_chunk_excerpt.startswith("### ["):
+                parts = clean_chunk_excerpt.split("\n\n", 1)
+                if len(parts) > 1:
+                    clean_chunk_excerpt = parts[1].strip()
+            if clean_chunk_excerpt not in existing.excerpt:
+                if _estimate_tokens(existing.excerpt) + _estimate_tokens(clean_chunk_excerpt) <= int(token_budget * 1.5):
+                    existing.excerpt = f"{existing.excerpt}\n\n{clean_chunk_excerpt}"
 
         if len(results) >= top_k:
             break

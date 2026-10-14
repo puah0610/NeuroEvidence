@@ -211,6 +211,40 @@ def test_claim_extraction_multi_citation() -> None:
     assert claims[0].label == VerificationLabel.supported
 
 
+def test_sync_answer_citations():
+    from app.models import ClaimCheck, VerificationLabel
+    from app.verification import sync_answer_citations
+
+    draft = (
+        "### Main Topic: Epilepsy\n"
+        "A single provoked seizure does not automatically establish epilepsy. [S1]\n"
+        "Focal seizures may evolve to bilateral tonic-clonic activity."
+    )
+    claims = [
+        ClaimCheck(
+            claim="A single provoked seizure does not automatically establish epilepsy",
+            citation_markers=["S2"],
+            label=VerificationLabel.supported,
+            score=0.9,
+            explanation="Supported via secondary retrieval from [NICE] (S2) (originally cited S1)",
+        ),
+        ClaimCheck(
+            claim="Focal seizures may evolve to bilateral tonic-clonic activity",
+            citation_markers=["S3"],
+            label=VerificationLabel.supported,
+            score=0.88,
+            explanation="Supported by retrieved source [S3]",
+        ),
+    ]
+
+    synced = sync_answer_citations(draft, claims)
+    # The first claim should have updated marker [S2] instead of [S1]
+    assert "[S2]" in synced
+    assert "[S1]" not in synced
+    # The previously uncited claim should now have marker [S3]
+    assert "[S3]" in synced
+
+
 
 
 

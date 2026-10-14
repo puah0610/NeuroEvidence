@@ -27,6 +27,11 @@ import { cleanLatexMath, parseAnswerBlocks } from './chatUtils'
 
 const starterQuestions = [
   {
+    title: 'PD Causes & Guideline Evidence (Multi-Part)',
+    query: "What causes Parkinson's disease, and what evidence supports the treatments described in guidelines?",
+    tag: 'Selective Decomposition • Triad',
+  },
+  {
     title: 'NICE NG217 Monotherapy Algorithms',
     query: 'What does NICE NG217 recommend for first-line treatment of focal vs generalized seizures?',
     tag: 'Epilepsy • Guidelines',
@@ -40,11 +45,6 @@ const starterQuestions = [
     title: 'Hoehn & Yahr Staging & Pharmacotherapy',
     query: "How do Hoehn & Yahr staging and NICE NG71 guide levodopa vs dopamine agonists in Parkinson's?",
     tag: 'Parkinsons • Staging',
-  },
-  {
-    title: 'Metoclopramide & Levodopa Contraindication',
-    query: 'Why is metoclopramide strictly contraindicated in patients receiving levodopa therapy?',
-    tag: 'Contraindication • D2 Antagonist',
   },
 ]
 
@@ -224,10 +224,25 @@ function AssistantMessageCard({ result }) {
             {result.citations.length} triad sources
           </span>
         )}
+        {result.original_answer && (
+          <span className="rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-bold text-sky-800">
+            Revised via Verification
+          </span>
+        )}
+        {result.subqueries?.length > 1 && (
+          <span className="rounded-full bg-violet-50 border border-violet-200 px-2 py-0.5 text-[10px] font-bold text-violet-800">
+            {result.subqueries.length} decomposed subqueries
+          </span>
+        )}
       </div>
 
       {/* Main Response Box */}
       <div className="rounded-3xl border border-neutral-200/80 bg-white p-5 sm:p-7 shadow-soft">
+        {/* Selective Query Decomposition (Multi-Part inquiries) */}
+        {result.subqueries?.length > 1 && (
+          <SubqueryDecompositionPanel subqueries={result.subqueries} />
+        )}
+
         {/* Warnings */}
         {result.warnings?.length > 0 && (
           <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-xs text-amber-900">
@@ -564,6 +579,31 @@ function VerificationSection({ result, isOpen, onToggle }) {
               </div>
             </div>
           )}
+
+          {/* Bounded Answer Revision Trace */}
+          {result.original_answer && (
+            <div className="rounded-xl border border-sky-200/80 bg-sky-50/50 p-3 text-xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-sky-950 flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-sky-700" /> Bounded Answer Revision Audit
+                </span>
+                <span className="text-[10px] font-semibold text-sky-800">
+                  Initial Draft Retained
+                </span>
+              </div>
+              <p className="text-[11px] text-sky-900/80 leading-relaxed mb-2">
+                Unsupported statements or unverified citations in the draft were repaired through secondary retrieval and NLI verification feedback.
+              </p>
+              <details className="text-[11px]">
+                <summary className="cursor-pointer font-semibold text-sky-800 hover:text-sky-950 select-none">
+                  View Initial Pre-Revision Draft ▸
+                </summary>
+                <div className="mt-2 rounded-lg border border-neutral-200 bg-white p-2.5 font-mono text-[10px] text-neutral-600 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                  {result.original_answer}
+                </div>
+              </details>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -617,6 +657,109 @@ function SourcesSection({ citations }) {
           </a>
         ))}
       </div>
+    </div>
+  )
+}
+
+function SubqueryDecompositionPanel({ subqueries }) {
+  const [isOpen, setIsOpen] = useState(true)
+  if (!subqueries || subqueries.length <= 1) return null
+
+  const evidenceCount = subqueries.filter((s) => s.has_evidence).length
+  const gapCount = subqueries.length - evidenceCount
+
+  return (
+    <div className="mb-4 rounded-2xl border border-violet-200/80 bg-violet-50/40 p-4 text-xs shadow-2xs">
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex cursor-pointer items-center justify-between select-none"
+      >
+        <div className="flex items-center gap-2">
+          <span className="grid h-6 w-6 place-items-center rounded-lg bg-violet-100 text-violet-800">
+            <Layers size={14} />
+          </span>
+          <div>
+            <span className="font-bold text-violet-950">
+              Selective Query Decomposition
+            </span>
+            <span className="ml-2 font-medium text-violet-700/80">
+              ({subqueries.length} Information Needs)
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100/80 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+            <CheckCircle2 size={11} /> {evidenceCount} Covered
+          </span>
+          {gapCount > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+              <AlertTriangle size={11} /> {gapCount} Gap
+            </span>
+          )}
+          <button className="text-violet-600 transition hover:text-violet-950">
+            {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </button>
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="mt-3.5 space-y-2.5 border-t border-violet-200/60 pt-3">
+          <p className="text-[11px] leading-relaxed text-violet-900/80">
+            The multi-part clinical question was decomposed into focused subqueries preserving clinical constraints, retrieved across Triad layers, and deduplicated:
+          </p>
+          <div className="grid gap-2">
+            {subqueries.map((sq, idx) => {
+              const layerColors = {
+                1: 'bg-indigo-50 border-indigo-200 text-indigo-800',
+                2: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+                3: 'bg-purple-50 border-purple-200 text-purple-800',
+              }[sq.target_layer] || 'bg-neutral-50 border-neutral-200 text-neutral-800'
+
+              return (
+                <div
+                  key={sq.subquery_id || idx}
+                  className="rounded-xl border border-white/80 bg-white/90 p-3 shadow-2xs"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-violet-800">
+                        {sq.subquery_id}
+                      </span>
+                      {sq.target_layer && (
+                        <span className={`rounded border px-2 py-0.5 text-[10px] font-bold ${layerColors}`}>
+                          Layer {sq.target_layer}: {sq.target_layer_name?.split(':')[1]?.trim() || 'Triad'}
+                        </span>
+                      )}
+                    </div>
+                    {sq.has_evidence ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+                        <CheckCircle2 size={12} /> {sq.chunks_found} sources retrieved
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700">
+                        <AlertTriangle size={12} /> Explicit Gap Identified
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="font-semibold text-ink text-xs mb-1">
+                    "{sq.query_text}"
+                  </p>
+                  <p className="text-[11px] text-neutral-500">
+                    <span className="font-semibold text-neutral-600">Information Need:</span> {sq.intent_description}
+                  </p>
+                  {!sq.has_evidence && sq.missing_evidence_statement && (
+                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/80 p-2 text-[11px] text-amber-900 leading-relaxed">
+                      <strong>Unanswered Part Notice:</strong> {sq.missing_evidence_statement}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

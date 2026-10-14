@@ -1,0 +1,1300 @@
+{
+  "benchmark_timestamp": "2026-10-13T18:43:37Z",
+  "aggregated": {
+    "Pipeline A (Legacy Baseline)": {
+      "total_runs": 8,
+      "mean_latency_ms": 4520.8,
+      "mean_input_tokens": 0.0,
+      "mean_output_tokens": 0.0,
+      "mean_evidence_tokens": 1498.5,
+      "mean_coverage_0_2": 1.5,
+      "mean_abstention_accuracy": 0.88,
+      "total_claims_checked": 371,
+      "total_supported": 364,
+      "total_contradicted": 0,
+      "total_insufficient": 7,
+      "support_rate": 0.981,
+      "mean_evidence_score": 0.921,
+      "mean_citation_precision": 1.0,
+      "revisions_triggered": 0,
+      "category_breakdown": {
+        "simple": {
+          "count": 2,
+          "mean_coverage": 2.0,
+          "mean_latency_ms": 8601.5,
+          "supported_claims": 77,
+          "total_claims": 78
+        },
+        "comparison": {
+          "count": 2,
+          "mean_coverage": 2.0,
+          "mean_latency_ms": 2361.5,
+          "supported_claims": 102,
+          "total_claims": 103
+        },
+        "multiple_sources": {
+          "count": 2,
+          "mean_coverage": 2.0,
+          "mean_latency_ms": 4655.5,
+          "supported_claims": 103,
+          "total_claims": 107
+        },
+        "corpus_unanswerable": {
+          "count": 2,
+          "mean_coverage": 0.0,
+          "mean_latency_ms": 2464.5,
+          "supported_claims": 82,
+          "total_claims": 83
+        }
+      }
+    },
+    "Pipeline B (+ Parent Expansion)": {
+      "total_runs": 8,
+      "mean_latency_ms": 2773.1,
+      "mean_input_tokens": 0.0,
+      "mean_output_tokens": 0.0,
+      "mean_evidence_tokens": 1696.8,
+      "mean_coverage_0_2": 1.5,
+      "mean_abstention_accuracy": 0.88,
+      "total_claims_checked": 456,
+      "total_supported": 210,
+      "total_contradicted": 0,
+      "total_insufficient": 246,
+      "support_rate": 0.461,
+      "mean_evidence_score": 0.697,
+      "mean_citation_precision": 1.0,
+      "revisions_triggered": 0,
+      "category_breakdown": {
+        "simple": {
+          "count": 2,
+          "mean_coverage": 2.0,
+          "mean_latency_ms": 2872.5,
+          "supported_claims": 55,
+          "total_claims": 93
+        },
+        "comparison": {
+          "count": 2,
+          "mean_coverage": 2.0,
+          "mean_latency_ms": 2350.5,
+          "supported_claims": 54,
+          "total_claims": 135
+        },
+        "multiple_sources": {
+          "count": 2,
+          "mean_coverage": 2.0,
+          "mean_latency_ms": 3387.5,
+          "supported_claims": 66,
+          "total_claims": 127
+        },
+        "corpus_unanswerable": {
+          "count": 2,
+          "mean_coverage": 0.0,
+          "mean_latency_ms": 2482.0,
+          "supported_claims": 35,
+          "total_claims": 101
+        }
+      }
+    },
+    "Pipeline C (+ Both Improvements)": {
+      "total_runs": 8,
+      "mean_latency_ms": 5200.5,
+      "mean_input_tokens": 0.0,
+      "mean_output_tokens": 0.0,
+      "mean_evidence_tokens": 1696.8,
+      "mean_coverage_0_2": 2.0,
+      "mean_abstention_accuracy": 1.0,
+      "total_claims_checked": 464,
+      "total_supported": 395,
+      "total_contradicted": 2,
+      "total_insufficient": 67,
+      "support_rate": 0.851,
+      "mean_evidence_score": 0.861,
+      "mean_citation_precision": 1.0,
+      "revisions_triggered": 8,
+      "category_breakdown": {
+        "simple": {
+          "count": 2,
+          "mean_coverage": 2.0,
+          "mean_latency_ms": 4756.0,
+          "supported_claims": 76,
+          "total_claims": 95
+        },
+        "comparison": {
+          "count": 2,
+          "mean_coverage": 2.0,
+          "mean_latency_ms": 5054.5,
+          "supported_claims": 99,
+          "total_claims": 137
+        },
+        "multiple_sources": {
+          "count": 2,
+          "mean_coverage": 2.0,
+          "mean_latency_ms": 6025.5,
+          "supported_claims": 122,
+          "total_claims": 129
+        },
+        "corpus_unanswerable": {
+          "count": 2,
+          "mean_coverage": 2.0,
+          "mean_latency_ms": 4966.0,
+          "supported_claims": 98,
+          "total_claims": 103
+        }
+      }
+    }
+  },
+  "detailed_runs": [
+    {
+      "question_id": "SIMP-01",
+      "category": "simple",
+      "topic": "Parkinson's disease",
+      "question": "What are the cardinal motor features of Parkinson's disease?",
+      "pipeline": "Pipeline A (Legacy Baseline)",
+      "latency_ms": 14231,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1642,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-063",
+          "PD-032",
+          "PD-023"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1558,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 59,
+        "supported": 59,
+        "contradicted": 0,
+        "insufficient": 0,
+        "evidence_score": 0.973,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Thoroughly addressed core factual entities and clinical definitions.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": []
+    },
+    {
+      "question_id": "SIMP-02",
+      "category": "simple",
+      "topic": "epilepsy",
+      "question": "What does an unprovoked seizure mean in the definition of epilepsy?",
+      "pipeline": "Pipeline A (Legacy Baseline)",
+      "latency_ms": 2972,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 940,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "EP-068",
+          "EP-063",
+          "EP-083"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 889,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Epilepsy:** The formal definition of epilepsy h...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Epilepsy:** The formal definition of epilepsy h..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 19,
+        "supported": 18,
+        "contradicted": 0,
+        "insufficient": 1,
+        "evidence_score": 0.946,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Thoroughly addressed core factual entities and clinical definitions.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "COMP-01",
+      "category": "comparison",
+      "topic": "epilepsy",
+      "question": "How can focal and generalized seizures differ in clinical presentation and diagnosis?",
+      "pipeline": "Pipeline A (Legacy Baseline)",
+      "latency_ms": 2410,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1590,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "EP-083",
+          "EP-007",
+          "TRIAD-EP-L3-02"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1539,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a common neurologic...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a common neurologic..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 42,
+        "supported": 41,
+        "contradicted": 0,
+        "insufficient": 1,
+        "evidence_score": 0.857,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Fully covered both comparative entities with explicit clinical contrast.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "COMP-02",
+      "category": "comparison",
+      "topic": "Parkinson's disease",
+      "question": "How do levodopa and dopamine agonists differ in clinical role, efficacy, and motor complications for Parkinson's disease?",
+      "pipeline": "Pipeline A (Legacy Baseline)",
+      "latency_ms": 2313,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1634,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-063",
+          "PD-009",
+          "PD-032"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1558,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 61,
+        "supported": 61,
+        "contradicted": 0,
+        "insufficient": 0,
+        "evidence_score": 0.975,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Fully covered both comparative entities with explicit clinical contrast.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": []
+    },
+    {
+      "question_id": "MULT-01",
+      "category": "multiple_sources",
+      "topic": "Parkinson's disease",
+      "question": "How is Parkinson's disease disease severity staged using Hoehn and Yahr, and how does initial management align with clinical guideline recommendations?",
+      "pipeline": "Pipeline A (Legacy Baseline)",
+      "latency_ms": 2755,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1650,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-039",
+          "PD-009",
+          "PD-042"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1558,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 69,
+        "supported": 68,
+        "contradicted": 0,
+        "insufficient": 1,
+        "evidence_score": 0.965,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Synthesized foundational concepts with clinical guidance / drug interaction details.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "MULT-02",
+      "category": "multiple_sources",
+      "topic": "epilepsy",
+      "question": "What are the clinical indications and pharmacokinetic drug-drug interaction risks when co-prescribing valproate and lamotrigine in epilepsy?",
+      "pipeline": "Pipeline A (Legacy Baseline)",
+      "latency_ms": 6556,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1384,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "TRIAD-EP-L3-01",
+          "TRIAD-EP-L3-02",
+          "EP-115"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1383,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **SANAD II RCT:** Epilepsy is a common condition ...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **SANAD II RCT:** Epilepsy is a common condition ..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 38,
+        "supported": 35,
+        "contradicted": 0,
+        "insufficient": 3,
+        "evidence_score": 0.728,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Synthesized foundational concepts with clinical guidance / drug interaction details.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "UNAN-01",
+      "category": "corpus_unanswerable",
+      "topic": "Parkinson's disease",
+      "question": "Which single biomarker predicts every case of Parkinson's disease with perfect accuracy?",
+      "pipeline": "Pipeline A (Legacy Baseline)",
+      "latency_ms": 2636,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 4,
+        "evidence_tokens": 1908,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-047",
+          "PD-042",
+          "PD-062",
+          "PD-032"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1304,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 50,
+        "supported": 50,
+        "contradicted": 0,
+        "insufficient": 0,
+        "evidence_score": 0.97,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 0,
+        "coverage_notes": "Failed to appropriately abstain; asserted or implied a single universal predictor/gene exists.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": []
+    },
+    {
+      "question_id": "UNAN-02",
+      "category": "corpus_unanswerable",
+      "topic": "epilepsy",
+      "question": "Which single gene causes every form of epilepsy?",
+      "pipeline": "Pipeline A (Legacy Baseline)",
+      "latency_ms": 2293,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1240,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "EP-105",
+          "EP-083",
+          "EP-063"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1187,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a neurological diso...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a neurological diso..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 33,
+        "supported": 32,
+        "contradicted": 0,
+        "insufficient": 1,
+        "evidence_score": 0.957,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 0,
+        "coverage_notes": "Failed to appropriately abstain; asserted or implied a single universal predictor/gene exists.",
+        "appropriate_abstention_0_1": 0,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "SIMP-01",
+      "category": "simple",
+      "topic": "Parkinson's disease",
+      "question": "What are the cardinal motor features of Parkinson's disease?",
+      "pipeline": "Pipeline B (+ Parent Expansion)",
+      "latency_ms": 2755,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 2059,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-063",
+          "PD-032",
+          "PD-023"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1975,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 74,
+        "supported": 37,
+        "contradicted": 0,
+        "insufficient": 37,
+        "evidence_score": 0.723,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Thoroughly addressed core factual entities and clinical definitions.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "SIMP-02",
+      "category": "simple",
+      "topic": "epilepsy",
+      "question": "What does an unprovoked seizure mean in the definition of epilepsy?",
+      "pipeline": "Pipeline B (+ Parent Expansion)",
+      "latency_ms": 2990,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 940,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "EP-068",
+          "EP-063",
+          "EP-083"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 889,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Epilepsy:** The formal definition of epilepsy h...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Epilepsy:** The formal definition of epilepsy h..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 19,
+        "supported": 18,
+        "contradicted": 0,
+        "insufficient": 1,
+        "evidence_score": 0.946,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Thoroughly addressed core factual entities and clinical definitions.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "COMP-01",
+      "category": "comparison",
+      "topic": "epilepsy",
+      "question": "How can focal and generalized seizures differ in clinical presentation and diagnosis?",
+      "pipeline": "Pipeline B (+ Parent Expansion)",
+      "latency_ms": 2447,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1758,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "EP-083",
+          "EP-007",
+          "TRIAD-EP-L3-02"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1707,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a common neurologic...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a common neurologic..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 50,
+        "supported": 30,
+        "contradicted": 0,
+        "insufficient": 20,
+        "evidence_score": 0.669,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Fully covered both comparative entities with explicit clinical contrast.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "COMP-02",
+      "category": "comparison",
+      "topic": "Parkinson's disease",
+      "question": "How do levodopa and dopamine agonists differ in clinical role, efficacy, and motor complications for Parkinson's disease?",
+      "pipeline": "Pipeline B (+ Parent Expansion)",
+      "latency_ms": 2254,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 2260,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-063",
+          "PD-009",
+          "PD-032"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 2184,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 85,
+        "supported": 24,
+        "contradicted": 0,
+        "insufficient": 61,
+        "evidence_score": 0.617,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Fully covered both comparative entities with explicit clinical contrast.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts.",
+        "The evidence support score is below the configured verification threshold."
+      ]
+    },
+    {
+      "question_id": "MULT-01",
+      "category": "multiple_sources",
+      "topic": "Parkinson's disease",
+      "question": "How is Parkinson's disease disease severity staged using Hoehn and Yahr, and how does initial management align with clinical guideline recommendations?",
+      "pipeline": "Pipeline B (+ Parent Expansion)",
+      "latency_ms": 2675,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 2029,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-039",
+          "PD-009",
+          "PD-042"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1937,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 86,
+        "supported": 37,
+        "contradicted": 0,
+        "insufficient": 49,
+        "evidence_score": 0.687,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Synthesized foundational concepts with clinical guidance / drug interaction details.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "MULT-02",
+      "category": "multiple_sources",
+      "topic": "epilepsy",
+      "question": "What are the clinical indications and pharmacokinetic drug-drug interaction risks when co-prescribing valproate and lamotrigine in epilepsy?",
+      "pipeline": "Pipeline B (+ Parent Expansion)",
+      "latency_ms": 4100,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1491,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "TRIAD-EP-L3-01",
+          "TRIAD-EP-L3-02",
+          "EP-115"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1490,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **SANAD II RCT:** Epilepsy is a common condition ...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **SANAD II RCT:** Epilepsy is a common condition ..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 41,
+        "supported": 29,
+        "contradicted": 0,
+        "insufficient": 12,
+        "evidence_score": 0.622,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Synthesized foundational concepts with clinical guidance / drug interaction details.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts.",
+        "The evidence support score is below the configured verification threshold."
+      ]
+    },
+    {
+      "question_id": "UNAN-01",
+      "category": "corpus_unanswerable",
+      "topic": "Parkinson's disease",
+      "question": "Which single biomarker predicts every case of Parkinson's disease with perfect accuracy?",
+      "pipeline": "Pipeline B (+ Parent Expansion)",
+      "latency_ms": 2731,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1675,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-047",
+          "PD-042",
+          "PD-062"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1611,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 63,
+        "supported": 18,
+        "contradicted": 0,
+        "insufficient": 45,
+        "evidence_score": 0.613,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 0,
+        "coverage_notes": "Failed to appropriately abstain; asserted or implied a single universal predictor/gene exists.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts.",
+        "The evidence support score is below the configured verification threshold."
+      ]
+    },
+    {
+      "question_id": "UNAN-02",
+      "category": "corpus_unanswerable",
+      "topic": "epilepsy",
+      "question": "Which single gene causes every form of epilepsy?",
+      "pipeline": "Pipeline B (+ Parent Expansion)",
+      "latency_ms": 2233,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1362,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "EP-105",
+          "EP-083",
+          "EP-063"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1309,
+        "was_revised": false,
+        "has_revision_notice": false,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a neurological diso...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a neurological diso..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 38,
+        "supported": 17,
+        "contradicted": 0,
+        "insufficient": 21,
+        "evidence_score": 0.696,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 0,
+        "coverage_notes": "Failed to appropriately abstain; asserted or implied a single universal predictor/gene exists.",
+        "appropriate_abstention_0_1": 0,
+        "acknowledged_missing_evidence": false
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "SIMP-01",
+      "category": "simple",
+      "topic": "Parkinson's disease",
+      "question": "What are the cardinal motor features of Parkinson's disease?",
+      "pipeline": "Pipeline C (+ Both Improvements)",
+      "latency_ms": 5413,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 2059,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-063",
+          "PD-032",
+          "PD-023"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 2038,
+        "was_revised": true,
+        "has_revision_notice": true,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 75,
+        "supported": 58,
+        "contradicted": 0,
+        "insufficient": 17,
+        "evidence_score": 0.859,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Thoroughly addressed core factual entities and clinical definitions.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "SIMP-02",
+      "category": "simple",
+      "topic": "epilepsy",
+      "question": "What does an unprovoked seizure mean in the definition of epilepsy?",
+      "pipeline": "Pipeline C (+ Both Improvements)",
+      "latency_ms": 4099,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 940,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "EP-068",
+          "EP-063",
+          "EP-083"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 919,
+        "was_revised": true,
+        "has_revision_notice": true,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Epilepsy:** The formal definition of epilepsy h...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Epilepsy:** The formal definition of epilepsy h..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 20,
+        "supported": 18,
+        "contradicted": 0,
+        "insufficient": 2,
+        "evidence_score": 0.923,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Thoroughly addressed core factual entities and clinical definitions.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "COMP-01",
+      "category": "comparison",
+      "topic": "epilepsy",
+      "question": "How can focal and generalized seizures differ in clinical presentation and diagnosis?",
+      "pipeline": "Pipeline C (+ Both Improvements)",
+      "latency_ms": 5248,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1758,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "EP-083",
+          "EP-007",
+          "TRIAD-EP-L3-02"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1756,
+        "was_revised": true,
+        "has_revision_notice": true,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a common neurologic...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a common neurologic..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 51,
+        "supported": 30,
+        "contradicted": 0,
+        "insufficient": 21,
+        "evidence_score": 0.664,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Fully covered both comparative entities with explicit clinical contrast.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "COMP-02",
+      "category": "comparison",
+      "topic": "Parkinson's disease",
+      "question": "How do levodopa and dopamine agonists differ in clinical role, efficacy, and motor complications for Parkinson's disease?",
+      "pipeline": "Pipeline C (+ Both Improvements)",
+      "latency_ms": 4861,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 2260,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-063",
+          "PD-009",
+          "PD-032"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 2248,
+        "was_revised": true,
+        "has_revision_notice": true,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Neurodege..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 86,
+        "supported": 69,
+        "contradicted": 0,
+        "insufficient": 17,
+        "evidence_score": 0.877,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Fully covered both comparative entities with explicit clinical contrast.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "MULT-01",
+      "category": "multiple_sources",
+      "topic": "Parkinson's disease",
+      "question": "How is Parkinson's disease disease severity staged using Hoehn and Yahr, and how does initial management align with clinical guideline recommendations?",
+      "pipeline": "Pipeline C (+ Both Improvements)",
+      "latency_ms": 5554,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 2029,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-039",
+          "PD-009",
+          "PD-042"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1979,
+        "was_revised": true,
+        "has_revision_notice": true,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 87,
+        "supported": 85,
+        "contradicted": 0,
+        "insufficient": 2,
+        "evidence_score": 0.96,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Synthesized foundational concepts with clinical guidance / drug interaction details.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "MULT-02",
+      "category": "multiple_sources",
+      "topic": "epilepsy",
+      "question": "What are the clinical indications and pharmacokinetic drug-drug interaction risks when co-prescribing valproate and lamotrigine in epilepsy?",
+      "pipeline": "Pipeline C (+ Both Improvements)",
+      "latency_ms": 6497,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1491,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "TRIAD-EP-L3-01",
+          "TRIAD-EP-L3-02",
+          "EP-115"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1653,
+        "was_revised": true,
+        "has_revision_notice": true,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **SANAD II RCT:** Epilepsy is a common condition ...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **SANAD II RCT:** Epilepsy is a common condition ..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 42,
+        "supported": 37,
+        "contradicted": 1,
+        "insufficient": 4,
+        "evidence_score": 0.708,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Synthesized foundational concepts with clinical guidance / drug interaction details.",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": [
+        "At least one claim may contradict its cited evidence.",
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "UNAN-01",
+      "category": "corpus_unanswerable",
+      "topic": "Parkinson's disease",
+      "question": "Which single biomarker predicts every case of Parkinson's disease with perfect accuracy?",
+      "pipeline": "Pipeline C (+ Both Improvements)",
+      "latency_ms": 5074,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1675,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "PD-047",
+          "PD-042",
+          "PD-062"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1659,
+        "was_revised": true,
+        "has_revision_notice": true,
+        "answer_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson...",
+        "original_draft_preview": "### Main Topic: Parkinson's disease Evidence Overview\n\nParkinson's disease encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Parkinson..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 64,
+        "supported": 61,
+        "contradicted": 1,
+        "insufficient": 2,
+        "evidence_score": 0.95,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Appropriately acknowledged that no single biomarker/gene exists (sound clinical abstention).",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": [
+        "At least one claim may contradict its cited evidence.",
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    },
+    {
+      "question_id": "UNAN-02",
+      "category": "corpus_unanswerable",
+      "topic": "epilepsy",
+      "question": "Which single gene causes every form of epilepsy?",
+      "pipeline": "Pipeline C (+ Both Improvements)",
+      "latency_ms": 4858,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "estimated_cost_usd": 0.0,
+      "retrieval": {
+        "num_chunks": 3,
+        "evidence_tokens": 1362,
+        "layers": [
+          3
+        ],
+        "source_ids": [
+          "EP-105",
+          "EP-083",
+          "EP-063"
+        ]
+      },
+      "generation": {
+        "answer_word_count": 1371,
+        "was_revised": true,
+        "has_revision_notice": true,
+        "answer_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a neurological diso...",
+        "original_draft_preview": "### Main Topic: Epilepsy Evidence Overview\n\nEpilepsy encompasses foundational pathophysiology, established clinical guidelines, and empirical trial outcomes synthesized across the Triad [S1].\n\n#### Supporting Clinical Evidence:\n\n• **Introduction:** Epilepsy is a neurological diso..."
+      },
+      "claims_and_faithfulness": {
+        "total_claims": 39,
+        "supported": 37,
+        "contradicted": 0,
+        "insufficient": 2,
+        "evidence_score": 0.949,
+        "citation_count": 3,
+        "citation_precision": 1.0
+      },
+      "coverage_and_abstention": {
+        "coverage_0_2": 2,
+        "coverage_notes": "Appropriately acknowledged that no single biomarker/gene exists (sound clinical abstention).",
+        "appropriate_abstention_0_1": 1,
+        "acknowledged_missing_evidence": true
+      },
+      "warnings": [
+        "Some claims are not sufficiently supported by their cited excerpts."
+      ]
+    }
+  ]
+}

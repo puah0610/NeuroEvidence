@@ -90,6 +90,17 @@ class ClaimCheck(BaseModel):
     explanation: str
 
 
+class SubqueryResult(BaseModel):
+    subquery_id: str
+    query_text: str
+    intent_description: str
+    target_layer: int | None = None
+    target_layer_name: str | None = None
+    has_evidence: bool = True
+    chunks_found: int = 0
+    missing_evidence_statement: str | None = None
+
+
 class ChatResponse(BaseModel):
     trace_id: str
     intent: Intent
@@ -98,6 +109,7 @@ class ChatResponse(BaseModel):
     original_answer: str | None = None
     citations: list[CitationResult] = Field(default_factory=list)
     claim_checks: list[ClaimCheck] = Field(default_factory=list)
+    subqueries: list[SubqueryResult] = Field(default_factory=list)
     evidence_score: float | None = Field(default=None, ge=0, le=1)
     evidence_threshold: float | None = None
     warnings: list[str] = Field(default_factory=list)
