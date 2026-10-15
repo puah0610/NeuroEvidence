@@ -299,6 +299,26 @@ export default function SettingsModal({
                       className="h-4 w-4 rounded accent-ocean cursor-pointer"
                     />
                   </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-neutral-700">Agentic Live PubMed Fallback</span>
+                        <span className="rounded bg-cyan-100 px-1.5 py-0.5 text-[9px] font-bold text-cyan-800 uppercase tracking-wide">
+                          NCBI Live
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-neutral-400">
+                        Automatically query NCBI E-utilities & neural-rerank clinical trials when local corpus lacks empirical evidence
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.general.enableLivePubMed ?? true}
+                      onChange={(e) => updateNested('general', 'enableLivePubMed', e.target.checked)}
+                      className="h-4 w-4 rounded accent-ocean cursor-pointer"
+                    />
+                  </div>
                 </div>
 
                 {/* Language */}

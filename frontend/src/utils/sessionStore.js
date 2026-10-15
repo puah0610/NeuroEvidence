@@ -101,6 +101,7 @@ export const DEFAULT_SETTINGS = {
     autoScroll: true,
     showShortcuts: true,
     language: 'en-US',
+    enableLivePubMed: true,
   },
   profile: {
     ...DEFAULT_USER,

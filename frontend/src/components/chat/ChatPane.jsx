@@ -498,6 +498,15 @@ function VerificationSection({ result, isOpen, onToggle }) {
         </div>
 
         <div className="flex items-center gap-2">
+          {result.live_pubmed_triggered && (
+            <span
+              title={`Query: ${result.live_pubmed_query || 'Live E-utilities'}`}
+              className="flex items-center gap-1.5 rounded-full bg-cyan-100 px-2.5 py-0.5 text-xs font-bold text-cyan-800 border border-cyan-300"
+            >
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-cyan-600 animate-pulse" />
+              Live PubMed Active
+            </span>
+          )}
           {score != null && (
             <span
               className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
@@ -542,9 +551,30 @@ function VerificationSection({ result, isOpen, onToggle }) {
                   {l3Count}
                 </span>
               </div>
-              <div className="mt-1 text-[10px] text-purple-700/70">SANAD II & Cochrane Reviews</div>
+              <div className="mt-1 text-[10px] text-purple-700/70">
+                {result.live_pubmed_triggered ? 'PubMed Live API & Trials' : 'SANAD II & Cochrane Reviews'}
+              </div>
             </div>
           </div>
+
+          {/* Live PubMed Query Details (when active) */}
+          {result.live_pubmed_triggered && (
+            <div className="rounded-xl border border-cyan-200 bg-cyan-50/60 p-3 text-xs text-cyan-900">
+              <div className="flex items-center justify-between">
+                <span className="font-bold flex items-center gap-1.5 text-cyan-800">
+                  <span className="h-2 w-2 rounded-full bg-cyan-600" />
+                  Agentic Live PubMed Fallback Triggered
+                </span>
+                <span className="text-[10px] font-semibold text-cyan-700">NCBI E-Utilities + Neural Rerank</span>
+              </div>
+              {result.live_pubmed_query && (
+                <div className="mt-2 rounded-lg bg-white/80 p-2 font-mono text-[11px] text-cyan-800 border border-cyan-200/50 break-all">
+                  <span className="text-[10px] font-bold text-cyan-600 block mb-0.5">FORMULATED MESH QUERY:</span>
+                  {result.live_pubmed_query}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Claim-Level Statements */}
           {result.claim_checks?.length > 0 && (

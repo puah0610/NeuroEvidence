@@ -361,6 +361,15 @@ class DemoRetriever:
     def get_source(self, source_id: str) -> RetrievedChunk | None:
         return next((item for item in DEMO_CHUNKS if item.source_id == source_id), None)
 
+    def add_chunks(self, chunks: list[RetrievedChunk]) -> int:
+        """Dynamically add chunks to the in-memory demo corpus."""
+        added = 0
+        for c in chunks:
+            if not any(dc.chunk_id == c.chunk_id for dc in DEMO_CHUNKS):
+                DEMO_CHUNKS.append(c)
+                added += 1
+        return added
+
 
 class ChromaRetriever:
     """Hybrid Dense + Sparse Retriever using ChromaDB dense embeddings, BM25 sparse ranking, and Neural Reranking."""
@@ -495,6 +504,76 @@ class ChromaRetriever:
                 metadata = result["metadatas"][0]
                 return _build_chunk(result["ids"][0], result["documents"][0], metadata, 0.0)
         return next((item for item in DEMO_CHUNKS if item.source_id == source_id), None)
+
+    def add_chunks(self, chunks: list[RetrievedChunk]) -> int:
+        """Dynamically index and persist new chunks (e.g. from live PubMed) into ChromaDB."""
+        if not chunks:
+            return 0
+
+        # Check existing ids in ChromaDB to prevent duplicate indexing
+        try:
+            existing = self.collection.get(ids=[c.chunk_id for c in chunks], include=[])
+            existing_ids = set(existing["ids"]) if existing and "ids" in existing else set()
+        except Exception as exc:
+            logger.debug("ChromaDB existing check error: %s", exc)
+            existing_ids = set()
+
+        unindexed = [c for c in chunks if c.chunk_id not in existing_ids]
+        if not unindexed:
+            return 0
+
+        # Embed Title + Excerpt for dense semantic matching fidelity
+        embed_texts = [f"{c.title}\n{c.excerpt}" for c in unindexed]
+        embeddings = self.embedder.embed(embed_texts)
+
+        documents = [c.excerpt for c in unindexed]
+        metadatas = []
+        for c in unindexed:
+            t = str(c.topic or "Parkinson's disease")
+            if "epilep" in t.lower() or "seizure" in t.lower():
+                norm_topic = "epilepsy"
+            else:
+                norm_topic = "Parkinson's disease"
+
+            meta = {
+                "title": c.title,
+                "document_id": c.document_id,
+                "source_id": c.source_id,
+                "authors": "|".join(c.authors) if isinstance(c.authors, list) else str(c.authors or ""),
+                "year": int(c.year) if c.year else 2024,
+                "journal": str(c.journal or "PubMed Central Clinical Evidence"),
+                "topic": norm_topic,
+                "url": str(c.url or ""),
+                "doi": str(c.doi or ""),
+                "pmid": str(c.pmid or ""),
+                "pmcid": str(c.pmcid or ""),
+                "license": str(c.license or "Open Access / PubMed NLM"),
+                "section": str(c.section or "Clinical Trial Abstract"),
+                "layer": int(c.layer) if c.layer else 3,
+                "layer_name": str(c.layer_name or "Layer 3: Empirical Evidence & Trials"),
+                "layer_source": str(c.layer_source or "PubMed Central / Clinical Trials"),
+                "subtopic": str(c.subtopic or "Live PubMed Ingestion"),
+                "parent_id": str(c.parent_id or c.chunk_id),
+                "parent_title": str(c.parent_title or c.title),
+                "breadcrumb": " > ".join(c.breadcrumb) if isinstance(c.breadcrumb, list) else str(c.breadcrumb or ""),
+                "demo": False,
+            }
+            metadatas.append(meta)
+
+        self.collection.upsert(
+            ids=[c.chunk_id for c in unindexed],
+            documents=documents,
+            metadatas=metadatas,
+            embeddings=embeddings,
+        )
+
+        # Also keep in DEMO_CHUNKS as in-memory fallback
+        for c in unindexed:
+            if not any(dc.chunk_id == c.chunk_id for dc in DEMO_CHUNKS):
+                DEMO_CHUNKS.append(c)
+
+        logger.info("Successfully persisted %d newly fetched live PubMed chunks into ChromaDB.", len(unindexed))
+        return len(unindexed)
 
 
 def _estimate_tokens(text: str) -> int:

@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     enable_bounded_answer_revision: bool = Field(default=True)
     enable_query_decomposition: bool = Field(default=True)
     max_decomposition_subqueries: int = Field(default=3, ge=2, le=5)
+    enable_live_pubmed_fallback: bool = True
+    live_pubmed_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
+    live_pubmed_max_candidates: int = Field(default=15, ge=5, le=30)
+    live_pubmed_top_k: int = Field(default=3, ge=1, le=10)
+    live_pubmed_timeout_seconds: float = Field(default=6.0, ge=1.0, le=30.0)
+    auto_save_live_pubmed: bool = True
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"), env_file_encoding="utf-8", extra="ignore"

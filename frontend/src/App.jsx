@@ -12,6 +12,7 @@ import {
   createNewSession,
   getStoredFolders,
   getStoredSessions,
+  getStoredSettings,
   getStoredUser,
   saveStoredFolders,
   saveStoredSessions,
@@ -210,10 +211,14 @@ export default function App() {
     setLoading(true)
 
     try {
+      const storedSettings = getStoredSettings()
+      const enableLivePubMed = storedSettings?.general?.enableLivePubMed ?? true
+
       const result = await api.chat({
         session_id: activeSession.id,
         question: clean,
         mode,
+        enable_live_pubmed: enableLivePubMed,
       })
 
       setSessions((prev) =>

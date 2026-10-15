@@ -27,6 +27,8 @@ class ChatRequest(BaseModel):
     session_id: str = Field(min_length=1, max_length=100)
     question: str = Field(min_length=2, max_length=4000)
     mode: ChatMode = ChatMode.rag_verified
+    enable_live_pubmed: bool | None = None
+    force_live_pubmed: bool | None = None
 
 
 from .ddi.models import DDIReport
@@ -115,6 +117,8 @@ class ChatResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     layer_distribution: dict[str, int] = Field(default_factory=dict)
     ddi_report: DDIReport | None = None
+    live_pubmed_triggered: bool = False
+    live_pubmed_query: str | None = None
     latency_ms: int
     model: str
     input_tokens: int = 0
