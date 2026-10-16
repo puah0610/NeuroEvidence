@@ -35,12 +35,17 @@ app = FastAPI(
     description="Educational neurology RAG research API; not a medical device.",
     lifespan=lifespan,
 )
+cors_origins = list(settings.cors_origin_list)
+for o in ("http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://127.0.0.1:3000"):
+    if o not in cors_origins:
+        cors_origins.append(o)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
-    allow_credentials=False,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

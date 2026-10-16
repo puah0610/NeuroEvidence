@@ -238,7 +238,7 @@ class GeminiAdapter:
         self.client = OpenAI(
             api_key=settings.gemini_api_key,
             base_url=settings.gemini_base_url,
-            timeout=10.0,
+            timeout=15.0,
             max_retries=0,
         )
 
@@ -294,13 +294,18 @@ class GeminiAdapter:
 
         models_to_try = [self.model_name]
         fallback_candidates = (
-            ["gemini-2.5-pro", "models/gemini-pro-latest"]
+            ["models/gemini-2.5-pro", "models/gemini-pro-latest", "gemini-2.5-pro"]
             if "pro" in self.model_name.lower()
-            else ["gemini-3.8-flash", "models/gemini-flash-latest", "gemini-3.5-flash-lite"]
+            else [
+                "models/gemini-3.1-flash-lite",
+                "models/gemini-3-flash-preview",
+                "models/gemini-flash-latest",
+            ]
         )
         for candidate in fallback_candidates:
             if candidate not in models_to_try:
                 models_to_try.append(candidate)
+        models_to_try = models_to_try[:2]
 
         last_exc = None
         for model in models_to_try:
@@ -313,13 +318,13 @@ class GeminiAdapter:
                 last_exc = exc
                 err_msg = str(exc).lower()
                 if "429" in err_msg or "resource_exhausted" in err_msg or "quota" in err_msg:
-                    GeminiAdapter._quota_exhausted = True
-                    logger.warning("Gemini API quota exhausted (429); fast fallback enabled.")
-                    raise exc
-                logger.warning("Gemini model %s encountered error: %s. Falling back...", model, exc)
+                    logger.warning("Gemini model %s quota exceeded (429); trying next candidate...", model)
+                else:
+                    logger.warning("Gemini model %s encountered error: %s. Falling back...", model, exc)
                 time.sleep(0.5)
                 continue
         if last_exc:
+            GeminiAdapter._quota_exhausted = True
             raise last_exc
 
     def generate_baseline(self, question: str) -> GenerationOutput:
@@ -519,7 +524,12 @@ class DemoGenerator:
                     clean_excerpt = parts[1].strip()
             # Remove any embedded (Layer X) mentions from excerpt
             clean_excerpt = re.sub(r"\s*\(Layer\s*\d+\)", "", clean_excerpt)
-            lines.append(f"• **{category}:** {clean_excerpt} [S{index}]")
+            # Bound excerpt to 1-2 concise informative clinical sentences (~250-320 chars max)
+            sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", clean_excerpt) if len(s.strip()) > 15]
+            bounded_summary = " ".join(sentences[:2]) if sentences else clean_excerpt[:260]
+            if len(bounded_summary) > 340:
+                bounded_summary = bounded_summary[:320].rsplit(" ", 1)[0] + "."
+            lines.append(f"• **{category}:** {bounded_summary} [S{index}]")
 
         if ddi_report and getattr(ddi_report, "has_interaction", False):
             drugs_str = ", ".join(getattr(ddi_report, "drug_names", []))
