@@ -6,7 +6,6 @@ import {
   Edit2,
   Folder,
   Layers,
-  Menu,
   PanelLeftClose,
   PanelLeftOpen,
   RotateCcw,

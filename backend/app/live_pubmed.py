@@ -10,7 +10,6 @@ import logging
 import re
 import xml.etree.ElementTree as ET
 from typing import Any
-from urllib.parse import quote_plus
 
 import httpx
 

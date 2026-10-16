@@ -18,7 +18,6 @@ import {
   ShieldCheck,
   Trash2,
   User,
-  X,
 } from 'lucide-react'
 import { formatSessionTimestamp } from '../../utils/sessionStore'
 

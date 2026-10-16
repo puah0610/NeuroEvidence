@@ -14,18 +14,17 @@ Evaluates 5 dimensions across 4 question archetypes:
 """
 
 import asyncio
-import copy
 import json
 import logging
 import re
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from .config import Settings, get_settings
 from .database import Database
-from .models import ChatRequest, ChatResponse, Intent
+from .models import ChatRequest, ChatResponse
 from .retrieval import _estimate_tokens
 from .service import ChatService
 

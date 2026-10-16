@@ -11,7 +11,7 @@ from app.service import ChatService
 
 
 def test_gemini_settings_defaults():
-    settings = Settings(demo_mode=True)
+    settings = Settings(_env_file=None, demo_mode=True)
     assert settings.llm_provider == "gemini"
     assert settings.gemini_generation_model == "gemini-3.8-flash"
     assert settings.gemini_embedding_model == "gemini-embedding-001"
@@ -24,6 +24,7 @@ def test_gemini_settings_defaults():
 
 def test_gemini_settings_enabled():
     settings = Settings(
+        _env_file=None,
         demo_mode=False,
         llm_provider="gemini",
         gemini_api_key="test-key",
@@ -35,12 +36,12 @@ def test_gemini_settings_enabled():
 
 
 def test_create_llm_adapter_factory():
-    gemini_settings = Settings(llm_provider="gemini", gemini_api_key="test-key")
+    gemini_settings = Settings(_env_file=None, llm_provider="gemini", gemini_api_key="test-key")
     adapter = create_llm_adapter(gemini_settings)
     assert isinstance(adapter, GeminiAdapter)
     assert adapter.model_name == "gemini-3.8-flash"
 
-    openai_settings = Settings(llm_provider="openai", openai_api_key="test-key")
+    openai_settings = Settings(_env_file=None, llm_provider="openai", openai_api_key="test-key")
     openai_adapter = create_llm_adapter(openai_settings)
     assert isinstance(openai_adapter, OpenAIAdapter)
 

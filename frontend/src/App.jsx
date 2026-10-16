@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from './api'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
@@ -12,7 +12,6 @@ import {
   createNewSession,
   getStoredFolders,
   getStoredSessions,
-  getStoredSettings,
   getStoredUser,
   saveStoredFolders,
   saveStoredSessions,

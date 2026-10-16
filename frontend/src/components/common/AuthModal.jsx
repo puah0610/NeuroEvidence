@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Brain, CheckCircle2, Lock, LogIn, ShieldAlert, Sparkles, User } from 'lucide-react'
+import { Brain, CheckCircle2, LogIn, ShieldAlert } from 'lucide-react'
 
 export default function AuthModal({ isOpen, onClose, onLogin, userProfile }) {
   const [selectedUser, setSelectedUser] = useState(userProfile?.name || 'Dr. Daniel')

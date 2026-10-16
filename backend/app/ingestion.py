@@ -16,7 +16,7 @@ from time import sleep
 import httpx
 
 from .config import get_settings
-from .llm import OpenAIAdapter, create_llm_adapter
+from .llm import create_llm_adapter
 
 
 PREPROCESSING_VERSION = "jats-v1"
@@ -412,7 +412,7 @@ def discover_candidates(
     print(f"Total candidates in {output_path}: {len(all_rows)} ({len(new_rows)} newly added, {len(existing_rows)} previously existing)")
 
     if auto_accept and manifest_path is not None:
-        print("\n[Option 1: Auto-Accept] Promoting candidates directly into corpus manifest (bypassing ASReview)...")
+        print("\n[Auto-Accept] Promoting candidates directly into corpus manifest...")
         if new_rows:
             accept_candidates(manifest_path=manifest_path, records=new_rows)
         else:
@@ -431,6 +431,10 @@ def _fetch_oa_license(client: httpx.Client, pmcid: str) -> str:
         return record.attrib.get("license", "REVIEW_REQUIRED") if record is not None else "REVIEW_REQUIRED"
     except (httpx.HTTPError, ET.ParseError):
         return "REVIEW_REQUIRED"
+
+
+def _text(element: ET.Element | None) -> str:
+    return "" if element is None else "".join(element.itertext())
 
 
 def parse_jats(xml_path: Path, record: ManifestRecord) -> list[Chunk]:
@@ -678,253 +682,6 @@ def clean_text(value: str) -> str:
     return value.strip()
 
 
-def _text(element: ET.Element | None) -> str:
-    return "" if element is None else "".join(element.itertext())
-
-
-def _fetch_pubmed_abstracts_batch(pmids: list[str], chunk_size: int = 40) -> dict[str, str]:
-    """Fetch abstracts for PubMed IDs in batches using NCBI E-utilities."""
-    abstracts: dict[str, str] = {}
-    base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
-    headers = {"User-Agent": "NeuroEvidence-FYP/0.1 (educational research)"}
-    with httpx.Client(timeout=30, headers=headers) as client:
-        for i in range(0, len(pmids), chunk_size):
-            chunk = [p for p in pmids[i : i + chunk_size] if p]
-            if not chunk:
-                continue
-            try:
-                resp = client.get(base, params={"db": "pubmed", "id": ",".join(chunk), "retmode": "xml"})
-                if resp.status_code == 200:
-                    root = ET.fromstring(resp.text)
-                    for article in root.findall(".//PubmedArticle"):
-                        pmid_el = article.find(".//MedlineCitation/PMID")
-                        if pmid_el is None or not pmid_el.text:
-                            continue
-                        pmid_val = pmid_el.text.strip()
-                        abstract_texts = article.findall(".//Article/Abstract/AbstractText")
-                        combined = " ".join(_text(el) for el in abstract_texts)
-                        if combined:
-                            abstracts[pmid_val] = clean_text(combined)
-            except Exception as exc:
-                print(f"Warning: could not fetch abstracts for batch {i}: {exc}", file=sys.stderr)
-            sleep(0.2)
-    return abstracts
-
-
-def export_asreview(
-    candidates_path: Path,
-    output_path: Path,
-    fetch_abstracts: bool = True,
-    topic: str | None = None,
-) -> None:
-    """Export candidate records into an ASReview-ready CSV with title, abstract, and metadata."""
-    if not candidates_path.exists():
-        raise FileNotFoundError(f"Candidates file not found: {candidates_path}")
-
-    with candidates_path.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = list(csv.DictReader(handle))
-
-    if topic:
-        target = topic.strip().lower()
-        code_to_topic = {
-            "pd": "parkinson's disease",
-            "ep": "epilepsy",
-            "st": "stroke",
-            "ms": "multiple sclerosis",
-        }
-        target = code_to_topic.get(target, target)
-        reader = [r for r in reader if r.get("topic", "").strip().lower() == target]
-
-    if not reader:
-        print(f"No candidates found to export (topic filter: {topic or 'all'}).", file=sys.stderr)
-        return
-
-    pmid_map: dict[str, str] = {}
-    if fetch_abstracts:
-        pmids_to_fetch = [row["pmid"] for row in reader if row.get("pmid") and not row.get("abstract")]
-        if pmids_to_fetch:
-            print(f"Fetching abstracts for {len(pmids_to_fetch)} candidate records from PubMed...")
-            pmid_map = _fetch_pubmed_abstracts_batch(pmids_to_fetch)
-
-    asreview_rows = []
-    for row in reader:
-        pmid = row.get("pmid", "")
-        abstract = row.get("abstract", "") or pmid_map.get(pmid, "")
-        if not abstract:
-            abstract = (
-                f"Neurological research article on {row.get('topic', 'neurology')}. "
-                f"Full text available at {row.get('url', '')}."
-            )
-        asreview_rows.append(
-            {
-                "source_id": row.get("source_id", ""),
-                "title": row.get("title", ""),
-                "abstract": clean_text(abstract),
-                "doi": row.get("doi", ""),
-                "topic": row.get("topic", ""),
-                "authors": row.get("authors", ""),
-                "year": row.get("year", ""),
-                "journal": row.get("journal", ""),
-                "url": row.get("url", ""),
-                "pmcid": row.get("pmcid", ""),
-                "pmid": pmid,
-                "license": row.get("license", ""),
-            }
-        )
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = [
-        "source_id",
-        "title",
-        "abstract",
-        "doi",
-        "topic",
-        "authors",
-        "year",
-        "journal",
-        "url",
-        "pmcid",
-        "pmid",
-        "license",
-    ]
-    with output_path.open("w", encoding="utf-8-sig", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(asreview_rows)
-
-    print(f"Exported {len(asreview_rows)} candidate records to ASReview pool at {output_path}")
-
-
-def sync_asreview(
-    asreview_path: Path,
-    manifest_path: Path,
-    candidates_path: Path,
-) -> None:
-    """Synchronize ASReview screening labels (included=1 / asreview_label=1) into corpus_manifest.csv."""
-    if not asreview_path.exists():
-        raise FileNotFoundError(f"ASReview export file not found: {asreview_path}")
-
-    with asreview_path.open("r", encoding="utf-8-sig", newline="") as handle:
-        raw_asreview_rows = list(csv.DictReader(handle))
-
-    asreview_rows = [
-        {k.strip().replace('"', '').replace('\ufeff', ''): v for k, v in r.items() if k}
-        for r in raw_asreview_rows
-    ]
-
-    included_identifiers: set[str] = set()
-    included_asreview_rows: list[dict[str, str]] = []
-    for row in asreview_rows:
-        incl_val = str(
-            row.get("included")
-            or row.get("final_included")
-            or row.get("asreview_label")
-            or ("1" if "relevant" in asreview_path.name.lower() else "")
-        ).strip().lower()
-        if incl_val in {"1", "1.0", "yes", "true"}:
-            included_asreview_rows.append(row)
-            for key in ("source_id", "doi", "pmcid", "title"):
-                val = row.get(key, "").strip().lower()
-                if val:
-                    included_identifiers.add(val)
-
-    if not included_identifiers and not included_asreview_rows:
-        print("No included articles found in the provided ASReview export.", file=sys.stderr)
-        return
-
-    candidates: list[dict[str, str]] = []
-    if candidates_path.exists():
-        with candidates_path.open("r", encoding="utf-8-sig", newline="") as handle:
-            raw_candidates = list(csv.DictReader(handle))
-            candidates = [
-                {k.strip().replace('"', '').replace('\ufeff', ''): v for k, v in r.items() if k}
-                for r in raw_candidates
-            ]
-
-    manifest_records: list[dict[str, str]] = []
-    if manifest_path.exists():
-        with manifest_path.open("r", encoding="utf-8-sig", newline="") as handle:
-            manifest_records = list(csv.DictReader(handle))
-
-    def _find_in_manifest(row: dict[str, str]) -> int | None:
-        row_src = row.get("source_id", "").strip().lower()
-        row_pmcid = row.get("pmcid", "").strip().upper()
-        row_pmid = row.get("pmid", "").strip()
-        row_doi = row.get("doi", "").strip().lower()
-        row_title = re.sub(r"\W+", "", row.get("title", "").strip().lower())
-        for idx, r in enumerate(manifest_records):
-            if row_src and r.get("source_id", "").strip().lower() == row_src:
-                return idx
-            r_pmcid = r.get("pmcid", "").strip().upper()
-            if row_pmcid and (r_pmcid == row_pmcid or r_pmcid.removeprefix("PMC") == row_pmcid.removeprefix("PMC")):
-                return idx
-            if row_pmid and r.get("pmid", "").strip() == row_pmid:
-                return idx
-            if row_doi and r.get("doi", "").strip().lower() == row_doi:
-                return idx
-            r_title = re.sub(r"\W+", "", r.get("title", "").strip().lower())
-            if row_title and r_title == row_title:
-                return idx
-        return None
-
-    synced_count = 0
-    synced_pmcids = set()
-
-    for candidate in candidates:
-        cand_matches = any(
-            candidate.get(k, "").strip().lower() in included_identifiers
-            for k in ("source_id", "doi", "pmcid", "title")
-            if candidate.get(k)
-        )
-        if cand_matches:
-            matched_row = dict(candidate)
-            matched_row["included"] = "yes"
-            if not matched_row.get("layer"):
-                matched_row["layer"] = "3"
-            if not matched_row.get("layer_name"):
-                matched_row["layer_name"] = "Layer 3: Empirical Evidence & Trials"
-            if not matched_row.get("layer_source"):
-                matched_row["layer_source"] = "PubMed Central / Clinical Trials"
-
-            found_idx = _find_in_manifest(matched_row)
-            if found_idx is not None:
-                manifest_records[found_idx]["included"] = "yes"
-            else:
-                manifest_records.append(matched_row)
-            synced_count += 1
-            if matched_row.get("pmcid"):
-                synced_pmcids.add(matched_row["pmcid"].strip().upper())
-
-    # In case articles in the ASReview export were not in the candidates pool file
-    for a_row in included_asreview_rows:
-        pmcid = a_row.get("pmcid", "").strip().upper()
-        if pmcid and pmcid not in synced_pmcids:
-            found_idx = _find_in_manifest(a_row)
-            if found_idx is not None:
-                manifest_records[found_idx]["included"] = "yes"
-            else:
-                new_row = dict(a_row)
-                new_row["included"] = "yes"
-                if not new_row.get("layer"):
-                    new_row["layer"] = "3"
-                if not new_row.get("layer_name"):
-                    new_row["layer_name"] = "Layer 3: Empirical Evidence & Trials"
-                if not new_row.get("layer_source"):
-                    new_row["layer_source"] = "PubMed Central / Clinical Trials"
-                manifest_records.append(new_row)
-                synced_count += 1
-                synced_pmcids.add(pmcid)
-
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = list(ManifestRecord.__annotations__.keys())
-    with manifest_path.open("w", encoding="utf-8-sig", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
-        writer.writerows(manifest_records)
-
-    print(f"Successfully synced {synced_count} included records into {manifest_path} (total manifest size: {len(manifest_records)} articles)")
-
-
 def accept_candidates(
     manifest_path: Path,
     candidates_path: Path | None = None,
@@ -932,7 +689,7 @@ def accept_candidates(
     topic: str | None = None,
     limit: int | None = None,
 ) -> int:
-    """Promote candidate records directly into corpus_manifest.csv with included='yes', bypassing ASReview."""
+    """Promote candidate records directly into corpus_manifest.csv with included='yes'."""
     source_records: list[dict[str, str]] = []
     if records is not None:
         source_records = list(records)
@@ -1051,16 +808,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
-        choices=["discover", "fetch", "index", "export-asreview", "sync-asreview", "accept-candidates"],
+        choices=["discover", "fetch", "index", "accept-candidates"],
     )
     parser.add_argument("--manifest", type=Path, default=Path("data/corpus_manifest.csv"))
     parser.add_argument("--raw-dir", type=Path, default=Path("data/raw"))
     parser.add_argument("--export", type=Path, default=Path("data/processed/chunks.jsonl"))
     parser.add_argument("--candidate-output", type=Path, default=Path("data/corpus_candidates.csv"))
     parser.add_argument("--candidates", type=Path, default=Path("data/corpus_candidates.csv"))
-    parser.add_argument("--asreview-pool", type=Path, default=Path("data/asreview_corpus_pool.csv"))
-    parser.add_argument("--asreview-file", type=Path, default=Path("data/asreview_export.csv"))
-    parser.add_argument("--no-fetch-abstracts", action="store_true", default=False)
     parser.add_argument("--per-topic", type=int, default=30)
     parser.add_argument(
         "--topics",
@@ -1084,7 +838,7 @@ def main() -> None:
         "--auto-accept",
         action="store_true",
         default=False,
-        help="Automatically promote candidates into corpus manifest with included='yes', bypassing ASReview.",
+        help="Automatically promote candidates into corpus manifest with included='yes'.",
     )
     parser.add_argument(
         "--limit",
@@ -1096,7 +850,7 @@ def main() -> None:
         "--topic",
         type=str,
         default=None,
-        help="Optional topic filter for export-asreview or accept-candidates (e.g. 'pd', 'ep', 'Parkinson\\'s disease', 'epilepsy').",
+        help="Optional topic filter for accept-candidates (e.g. 'pd', 'ep', 'Parkinson\\'s disease', 'epilepsy').",
     )
     parser.add_argument(
         "--embedder",
@@ -1119,8 +873,6 @@ def main() -> None:
     args.export = _resolve_project_path(args.export)
     args.candidate_output = _resolve_project_path(args.candidate_output)
     args.candidates = _resolve_project_path(args.candidates)
-    args.asreview_pool = _resolve_project_path(args.asreview_pool)
-    args.asreview_file = _resolve_project_path(args.asreview_file)
 
     if args.command == "discover":
         if args.topics.strip().lower() == "all":
@@ -1145,19 +897,6 @@ def main() -> None:
             args.export,
             embedder_type=args.embedder,
             reset=args.reset,
-        )
-    elif args.command == "export-asreview":
-        export_asreview(
-            args.candidates,
-            args.asreview_pool,
-            fetch_abstracts=not args.no_fetch_abstracts,
-            topic=args.topic,
-        )
-    elif args.command == "sync-asreview":
-        sync_asreview(
-            args.asreview_file,
-            args.manifest,
-            args.candidates,
         )
     elif args.command == "accept-candidates":
         accept_candidates(
