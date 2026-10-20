@@ -21,6 +21,11 @@ from .service import ChatService
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
+    if settings.langfuse_public_key and settings.langfuse_secret_key:
+        import os
+        os.environ["LANGFUSE_PUBLIC_KEY"] = settings.langfuse_public_key.strip()
+        os.environ["LANGFUSE_SECRET_KEY"] = settings.langfuse_secret_key.strip()
+        os.environ["LANGFUSE_HOST"] = settings.langfuse_host.strip()
     database = Database(settings.database_path)
     app.state.settings = settings
     app.state.database = database
@@ -65,6 +70,21 @@ async def source(source_id: str, request: Request) -> SourceRecord:
 @app.post("/api/feedback", response_model=FeedbackResponse, status_code=201)
 async def feedback(payload: FeedbackRequest, request: Request) -> FeedbackResponse:
     feedback_id = request.app.state.database.save_feedback(payload)
+    if payload.trace_id and getattr(request.app.state.settings, "langfuse_enabled", False):
+        try:
+            from langfuse import get_client
+            client = get_client()
+            val = 1.0 if payload.rating == "helpful" else 0.0
+            client.create_score(
+                name="user_feedback",
+                value=val,
+                trace_id=payload.trace_id,
+                comment=payload.comment or None,
+                data_type="NUMERIC",
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).debug("Langfuse feedback score skipped: %s", exc)
     return FeedbackResponse(feedback_id=feedback_id)
 
 

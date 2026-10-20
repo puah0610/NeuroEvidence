@@ -1,10 +1,23 @@
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from time import perf_counter
 from uuid import uuid4
 
+try:
+    from langfuse import get_client, observe
+except ImportError:
+    def observe(*args, **kwargs):
+        def decorator(f):
+            return f
+        return decorator
+
+    def get_client():
+        return None
+
 from .config import Settings
 from .database import Database
 from .ddi.checker import get_ddi_checker
+import re
 from .decomposition import QueryDecomposer, retrieve_with_decomposition
 from .llm import DemoGenerator, Generator, create_llm_adapter
 from .live_pubmed import LivePubMedRetriever
@@ -12,6 +25,59 @@ from .models import ChatRequest, ChatResponse, Intent
 from .retrieval import ChromaRetriever, DemoRetriever, TransformerDenseEmbedder
 from .safety import classify_query
 from .verification import CitationVerifier, make_nli, verify_answer
+
+
+def contextualize_query_for_retrieval(
+    question: str, history: list[dict[str, str]] | None, topic: str | None
+) -> str:
+    if not history:
+        return question
+
+    lower_q = question.lower()
+    anaphoric_markers = (
+        "that", "this", "these", "those", "it", "they", "them", "which", "their", "its", "same", "such",
+        "comparison", "compare", "difference", "differences", "guideline", "guidelines", "trial", "trials",
+        "evidence", "support", "supports", "why", "how so", "elaborate", "further", "again", "whose"
+    )
+    has_anaphora = any(re.search(rf"\b{m}\b", lower_q) for m in anaphoric_markers)
+    has_explicit_condition = any(
+        term in lower_q for term in ("parkinson", "epilep", "seizure", "seizures", "levodopa", "tremor")
+    )
+
+    if not has_anaphora and has_explicit_condition:
+        return question
+
+    prev_user_queries = [
+        msg.get("content", "").strip()
+        for msg in history
+        if msg.get("role") == "user" and msg.get("content", "").strip()
+    ]
+    if not prev_user_queries:
+        return question
+
+    last_user_query = prev_user_queries[-1]
+    if last_user_query.lower() == question.lower():
+        if len(prev_user_queries) > 1:
+            last_user_query = prev_user_queries[-2]
+        else:
+            return question
+
+    context_prefix = " ".join(prev_user_queries[-2:])
+    return f"{question} Context: {context_prefix}"
+
+
+@contextmanager
+def null_span():
+    yield None
+
+
+def start_span(client, name: str, as_type: str = "span"):
+    if client:
+        try:
+            return client.start_as_current_observation(name=name, as_type=as_type)
+        except Exception:
+            pass
+    return null_span()
 
 
 class ChatService:
@@ -51,10 +117,25 @@ class ChatService:
         self.decomposer = QueryDecomposer(settings, self.generator)
         self.live_pubmed = LivePubMedRetriever(settings, self.generator)
 
+    @observe(name="chat_pipeline")
     async def chat(self, request: ChatRequest) -> ChatResponse:
         started = perf_counter()
-        trace_id = str(uuid4())
-        decision = classify_query(request.question)
+        lf_client = get_client() if getattr(self.settings, "langfuse_enabled", False) else None
+        trace_id = (lf_client.get_current_trace_id() if lf_client else None) or str(uuid4())
+        if lf_client:
+            try:
+                lf_client.update_current_span(
+                    metadata={
+                        "session_id": request.session_id,
+                        "mode": request.mode.value,
+                        "demo_mode": self.settings.demo_mode,
+                        "llm_provider": self.settings.llm_provider,
+                    }
+                )
+            except Exception:
+                pass
+        history = request.history or self.database.get_session_history(request.session_id, limit=6)
+        decision = classify_query(request.question, history=history)
 
         if decision.intent != Intent.educational_in_scope:
             result = ChatResponse(
@@ -92,13 +173,44 @@ class ChatService:
             return result
 
         # Scan query for drug interactions (combining local rules & live openFDA API)
-        ddi_report = await self.ddi_checker.analyze_query(request.question)
+        with start_span(lf_client, "ddi_analysis", as_type="span") as ddi_span:
+            ddi_report = await self.ddi_checker.analyze_query(request.question)
+            if ddi_span:
+                try:
+                    ddi_span.update(
+                        output={
+                            "has_interaction": getattr(ddi_report, "has_interaction", False),
+                            "drugs_detected": getattr(ddi_report, "drugs_detected", []),
+                        }
+                    )
+                except Exception:
+                    pass
 
         # Step 1: Selective Query Decomposition & Triad Retrieval
-        decomp_plan = self.decomposer.decompose(request.question, topic=decision.topic)
-        chunks, subquery_results = retrieve_with_decomposition(
-            self.retriever, decomp_plan, decision.topic, self.settings
+        effective_query = (
+            decision.cleaned_educational_query
+            if (decision.has_adversarial_fabrication and decision.cleaned_educational_query)
+            else request.question
         )
+        retrieval_query = contextualize_query_for_retrieval(effective_query, history, decision.topic)
+        with start_span(lf_client, "triad_retrieval", as_type="retriever") as retrieval_span:
+            decomp_plan = self.decomposer.decompose(retrieval_query, topic=decision.topic)
+            chunks, subquery_results = retrieve_with_decomposition(
+                self.retriever, decomp_plan, decision.topic, self.settings
+            )
+            if retrieval_span:
+                try:
+                    retrieval_span.update(
+                        metadata={
+                            "topic": decision.topic,
+                            "chunks_found": len(chunks),
+                            "layer_counts": {
+                                f"Layer {lvl}": sum(1 for c in chunks if c.layer == lvl) for lvl in (1, 2, 3)
+                            },
+                        }
+                    )
+                except Exception:
+                    pass
 
         unanswered_parts = [
             sq.missing_evidence_statement
@@ -144,51 +256,77 @@ class ChatService:
         )
 
         if should_trigger_live_pubmed:
-            try:
-                live_chunks, live_query = await self.live_pubmed.search_and_rerank(
-                    request.question,
-                    topic=decision.topic,
-                    top_k=getattr(self.settings, "live_pubmed_top_k", 3),
-                )
-                if live_chunks:
-                    live_pubmed_triggered = True
-                    live_pubmed_query = live_query
-                    existing_chunk_ids = {c.chunk_id for c in chunks}
-                    for lc in live_chunks:
-                        if hasattr(self.live_pubmed, "_sources_by_id"):
-                            self.live_pubmed._sources_by_id[lc.source_id] = lc
-                        if lc.chunk_id not in existing_chunk_ids:
-                            chunks.append(lc)
-                            existing_chunk_ids.add(lc.chunk_id)
-
-                    # Dynamic Knowledge Base Expansion: auto-save newly fetched live PubMed chunks into ChromaDB
-                    if getattr(self.settings, "auto_save_live_pubmed", True):
+            with start_span(lf_client, "live_pubmed_fallback", as_type="tool") as live_span:
+                try:
+                    live_chunks, live_query = await self.live_pubmed.search_and_rerank(
+                        effective_query,
+                        topic=decision.topic,
+                        top_k=getattr(self.settings, "live_pubmed_top_k", 3),
+                    )
+                    if live_span:
                         try:
-                            if hasattr(self.retriever, "add_chunks"):
-                                saved_count = self.retriever.add_chunks(live_chunks)
-                                if saved_count > 0:
-                                    import logging
-                                    logging.getLogger(__name__).info(
-                                        "Auto-saved %d live PubMed chunks into ChromaDB knowledge base.", saved_count
-                                    )
-                        except Exception as save_err:
-                            import logging
-                            logging.getLogger(__name__).warning("Failed to auto-save live PubMed chunks: %s", save_err)
+                            live_span.update(
+                                metadata={
+                                    "query": live_query,
+                                    "results_count": len(live_chunks) if live_chunks else 0,
+                                }
+                            )
+                        except Exception:
+                            pass
+                    if live_chunks:
+                        live_pubmed_triggered = True
+                        live_pubmed_query = live_query
+                        existing_chunk_ids = {c.chunk_id for c in chunks}
+                        for lc in live_chunks:
+                            if hasattr(self.live_pubmed, "_sources_by_id"):
+                                self.live_pubmed._sources_by_id[lc.source_id] = lc
+                            if lc.chunk_id not in existing_chunk_ids:
+                                chunks.append(lc)
+                                existing_chunk_ids.add(lc.chunk_id)
 
-                    for sq in subquery_results:
-                        if sq.target_layer == 3 and not sq.has_evidence:
-                            sq.has_evidence = True
-                            sq.chunks_found = len(live_chunks)
-                            sq.missing_evidence_statement = None
+                        # Dynamic Knowledge Base Expansion: auto-save newly fetched live PubMed chunks into ChromaDB
+                        if getattr(self.settings, "auto_save_live_pubmed", True):
+                            try:
+                                if hasattr(self.retriever, "add_chunks"):
+                                    saved_count = self.retriever.add_chunks(live_chunks)
+                                    if saved_count > 0:
+                                        import logging
+                                        logging.getLogger(__name__).info(
+                                            "Auto-saved %d live PubMed chunks into ChromaDB knowledge base.", saved_count
+                                        )
+                            except Exception as save_err:
+                                import logging
+                                logging.getLogger(__name__).warning("Failed to auto-save live PubMed chunks: %s", save_err)
 
-                    unanswered_parts = [
-                        sq.missing_evidence_statement
-                        for sq in subquery_results
-                        if not sq.has_evidence and sq.missing_evidence_statement
-                    ]
-            except Exception as exc:
-                import logging
-                logging.getLogger(__name__).warning("Live PubMed fallback execution error: %s", exc)
+                        for sq in subquery_results:
+                            if sq.target_layer == 3 and not sq.has_evidence:
+                                sq.has_evidence = True
+                                sq.chunks_found = len(live_chunks)
+                                sq.missing_evidence_statement = None
+
+                        unanswered_parts = [
+                            sq.missing_evidence_statement
+                            for sq in subquery_results
+                            if not sq.has_evidence and sq.missing_evidence_statement
+                        ]
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).warning("Live PubMed fallback execution error: %s", exc)
+
+        # Check for real-time, zero-day, or specific recent timeframe constraints in query
+        temporal_match = re.search(
+            r"\b(this\s+morning|today|yesterday|this\s+week|past\s+few\s+hours|breaking\s+news|just\s+published)\b",
+            request.question,
+            re.IGNORECASE,
+        )
+        if temporal_match:
+            timeframe_phrase = temporal_match.group(1).lower()
+            temporal_unanswered = (
+                f"Publication timeframe '{timeframe_phrase}': No retrieved source is verified from this real-time timeframe. "
+                "Indexed knowledge base and literature retrieval systems operate with an indexing and publication lag."
+            )
+            if temporal_unanswered not in unanswered_parts:
+                unanswered_parts.append(temporal_unanswered)
 
         if not chunks:
             answer = (
@@ -216,25 +354,44 @@ class ChatService:
             return result
 
         generation = self.generator.generate_grounded(
-            request.question, chunks, ddi_report=ddi_report, unanswered_parts=unanswered_parts
+            request.question,
+            chunks,
+            ddi_report=ddi_report,
+            unanswered_parts=unanswered_parts,
+            has_adversarial_fabrication=decision.has_adversarial_fabrication,
+            history=history,
         )
         original_answer = generation.text
         total_input_tokens = generation.input_tokens
         total_output_tokens = generation.output_tokens
 
         # Step 2: Primary claim verification + Step 3: Targeted Secondary Retrieval (1 pass)
-        verification = await verify_answer(
-            original_answer,
-            chunks,
-            self.citation_verifier,
-            self.nli,
-            self.settings.evidence_threshold,
-            retriever=self.retriever,
-            topic=decision.topic,
-            enable_cross_chunk_fallback=self.settings.enable_cross_chunk_fallback,
-            enable_corrective_retrieval=self.settings.enable_corrective_retrieval,
-            max_corrective_claims=self.settings.corrective_retrieval_max_claims,
-        )
+        with start_span(lf_client, "nli_verification", as_type="evaluator") as nli_span:
+            verification = await verify_answer(
+                original_answer,
+                chunks,
+                self.citation_verifier,
+                self.nli,
+                self.settings.evidence_threshold,
+                retriever=self.retriever,
+                topic=decision.topic,
+                enable_cross_chunk_fallback=self.settings.enable_cross_chunk_fallback,
+                enable_corrective_retrieval=self.settings.enable_corrective_retrieval,
+                max_corrective_claims=self.settings.corrective_retrieval_max_claims,
+            )
+            if nli_span:
+                try:
+                    nli_span.update(
+                        metadata={
+                            "evidence_score": verification.evidence_score,
+                            "claims_count": len(verification.claims),
+                            "supported": sum(1 for c in verification.claims if c.label.value == "supported"),
+                            "contradicted": sum(1 for c in verification.claims if c.label.value == "contradicted"),
+                            "insufficient": sum(1 for c in verification.claims if c.label.value == "insufficient"),
+                        }
+                    )
+                except Exception:
+                    pass
         if verification.chunks:
             chunks = verification.chunks
         answer = original_answer
@@ -262,23 +419,31 @@ class ChatService:
                 chunks,
                 ddi_report=ddi_report,
                 unanswered_parts=unanswered_parts,
+                has_adversarial_fabrication=decision.has_adversarial_fabrication,
+                history=history,
             )
             revised_draft = revision_generation.text
             total_input_tokens += revision_generation.input_tokens
             total_output_tokens += revision_generation.output_tokens
 
             # Step 5: Verify again (bounded: corrective retrieval disabled to prevent infinite loops)
-            revised_verification = await verify_answer(
-                revised_draft,
-                chunks,
-                self.citation_verifier,
-                self.nli,
-                self.settings.evidence_threshold,
-                retriever=None,
-                topic=decision.topic,
-                enable_cross_chunk_fallback=self.settings.enable_cross_chunk_fallback,
-                enable_corrective_retrieval=False,
-            )
+            with start_span(lf_client, "revised_nli_verification", as_type="evaluator") as rev_span:
+                revised_verification = await verify_answer(
+                    revised_draft,
+                    chunks,
+                    self.citation_verifier,
+                    self.nli,
+                    self.settings.evidence_threshold,
+                    retriever=None,
+                    topic=decision.topic,
+                    enable_cross_chunk_fallback=self.settings.enable_cross_chunk_fallback,
+                    enable_corrective_retrieval=False,
+                )
+                if rev_span:
+                    try:
+                        rev_span.update(metadata={"evidence_score": revised_verification.evidence_score})
+                    except Exception:
+                        pass
 
             answer = revised_draft
             verification = revised_verification
@@ -307,6 +472,17 @@ class ChatService:
         for sq in subquery_results:
             if not sq.has_evidence:
                 warnings.append(f"Subquery '{sq.intent_description}' lacked direct evidence in indexed corpus.")
+
+        if lf_client:
+            try:
+                lf_client.score_current_trace(
+                    name="evidence_score",
+                    value=verification.evidence_score,
+                    comment=f"Evidence Threshold: {self.settings.evidence_threshold}",
+                    data_type="NUMERIC",
+                )
+            except Exception:
+                pass
 
         result = ChatResponse(
             trace_id=trace_id,

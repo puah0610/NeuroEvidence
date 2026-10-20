@@ -95,6 +95,30 @@ class Database:
                 ),
             )
 
+    def get_session_history(self, session_id: str, limit: int = 6) -> list[dict[str, str]]:
+        """Retrieve recent conversation turns for session_id in chronological order."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT question, answer
+                FROM traces
+                WHERE session_id = ?
+                ORDER BY created_at ASC
+                """,
+                (session_id,),
+            ).fetchall()
+
+        history: list[dict[str, str]] = []
+        for row in rows:
+            q = (row["question"] or "").strip()
+            a = (row["answer"] or "").strip()
+            if q:
+                history.append({"role": "user", "content": q})
+            if a:
+                history.append({"role": "assistant", "content": a})
+
+        return history[-limit:] if limit > 0 else history
+
     def save_feedback(self, request: FeedbackRequest) -> str:
         feedback_id = str(uuid4())
         with self._lock, self._connect() as connection:

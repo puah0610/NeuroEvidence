@@ -89,8 +89,8 @@ class LexicalNLIVerifier:
 
         if best_sent_overlap >= 0.45 and sent_negated != claim_negated:
             return VerificationLabel.contradicted, min(0.95, 0.55 + best_sent_overlap * 0.4)
-        if overall_overlap >= 0.42:
-            return VerificationLabel.supported, min(0.95, 0.5 + overall_overlap * 0.45)
+        if overall_overlap >= 0.32 or best_sent_overlap >= 0.35:
+            return VerificationLabel.supported, min(0.95, 0.5 + max(overall_overlap, best_sent_overlap) * 0.45)
         return VerificationLabel.insufficient, max(0.5, 1.0 - overall_overlap)
 
 
@@ -413,9 +413,9 @@ def extract_claims(
             claim = sentence.strip()
             if len(claim.split()) < 5:
                 continue
+            if _is_nonfactual_notice(claim):
+                continue
             if not marker_numbers:
-                if _is_nonfactual_notice(claim):
-                    continue
                 claims.append(
                     ClaimCheck(
                         claim=claim,
@@ -512,6 +512,14 @@ def _is_nonfactual_notice(claim: str) -> bool:
             "direct answer",
             "core takeaway",
             "bottom line",
+            "cannot invent",
+            "cannot fabricate",
+            "fictional references",
+            "fictitious references",
+            "fake references",
+            "bypass evidence",
+            "grounding requirements",
+            "evidence grounding",
         )
     ):
         return True

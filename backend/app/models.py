@@ -29,6 +29,7 @@ class ChatRequest(BaseModel):
     mode: ChatMode = ChatMode.rag_verified
     enable_live_pubmed: bool | None = None
     force_live_pubmed: bool | None = None
+    history: list[dict[str, str]] = Field(default_factory=list)
 
 
 from .ddi.models import DDIReport

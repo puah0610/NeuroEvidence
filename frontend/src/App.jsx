@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api'
 import Header from './components/layout/Header'
 import Sidebar from './components/layout/Sidebar'
@@ -12,6 +12,7 @@ import {
   createNewSession,
   getStoredFolders,
   getStoredSessions,
+  getStoredSettings,
   getStoredUser,
   saveStoredFolders,
   saveStoredSessions,
@@ -213,11 +214,19 @@ export default function App() {
       const storedSettings = getStoredSettings()
       const enableLivePubMed = storedSettings?.general?.enableLivePubMed ?? true
 
+      const history = (activeSession.messages || [])
+        .map((m) => ({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.role === 'assistant' ? (m.result?.answer || m.text || '') : (m.text || ''),
+        }))
+        .filter((h) => h.content)
+
       const result = await api.chat({
         session_id: activeSession.id,
         question: clean,
         mode,
         enable_live_pubmed: enableLivePubMed,
+        history: history.slice(-6),
       })
 
       setSessions((prev) =>

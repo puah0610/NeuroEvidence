@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     live_pubmed_top_k: int = Field(default=3, ge=1, le=10)
     live_pubmed_timeout_seconds: float = Field(default=6.0, ge=1.0, le=30.0)
     auto_save_live_pubmed: bool = True
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "https://cloud.langfuse.com"
 
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"), env_file_encoding="utf-8", extra="ignore"
@@ -72,6 +75,10 @@ class Settings(BaseSettings):
                 value = cwd.parent / value
         value.parent.mkdir(parents=True, exist_ok=True)
         return value
+
+    @property
+    def langfuse_enabled(self) -> bool:
+        return bool(self.langfuse_public_key and self.langfuse_secret_key)
 
     @property
     def gemini_enabled(self) -> bool:
