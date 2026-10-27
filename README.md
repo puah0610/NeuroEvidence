@@ -118,9 +118,9 @@ python -m app.ingestion index --manifest data/corpus_manifest.csv
 
 ## 📊 Comprehensive Evaluation & Benchmarking Suite
 
-NeuroEvidence includes three rigorous evaluation tracks designed for academic thesis defense:
+NeuroEvidence includes two primary, rigorous evaluation tracks designed for academic thesis defense:
 
-### Track 1: End-to-End RAG vs. Baseline & LLM-as-a-Judge
+### Track 1: End-to-End Clinical Benchmark (RAG vs. Baseline & LLM-as-a-Judge)
 
 Evaluate the locked 37-question evaluation set (`data/evaluation_questions.csv` — 11 validation, 26 locked test) across both baseline LLM and grounded RAG modes:
 
@@ -143,21 +143,7 @@ To compute non-parametric bootstrap 95% confidence intervals, formal abstention 
 python -m app.evaluate_metrics --judge-csv data/evaluation/judge_review.csv --traces data/evaluation/results.jsonl
 ```
 
-### Track 2: 3-Pipeline Comparative Evaluation
-
-Benchmarks the multi-dimensional impact of recent architectural improvements across 5 dimensions (Retrieval Relevance, Question Coverage, Claim Faithfulness, Missing Evidence Acknowledgment, Token Latency/Cost):
-
-- **Pipeline A (Legacy):** Isolated chunks with passive verification.
-- **Pipeline B (Parent Expansion):** Bounded parent section expansion with token budgeting.
-- **Pipeline C (Full Grounding):** Parent expansion + Bounded answer revision and citation synchronization.
-
-```powershell
-$env:PYTHONPATH = "backend"
-python -m app.evaluate_comparative
-```
-Outputs comprehensive comparative metrics to `data/evaluation/comparative_evaluation_results.json`.
-
-### Track 3: Dual-Track Biomedical NLI Calibration
+### Track 2: Dual-Track Biomedical NLI Calibration
 
 Validates the NLI verifier against external biomedical benchmarks (SciFact) and a domain-specific 120-pair neurology benchmark:
 
