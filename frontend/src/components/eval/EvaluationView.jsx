@@ -71,9 +71,13 @@ export default function EvaluationView({ summary }) {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
           <Breakdown
-            title="Runs by mode"
+            title="Runs by execution mode"
             data={summary?.by_mode}
-            labels={{ rag_verified: 'RAG + verification', baseline: 'Plain LLM baseline' }}
+            labels={{
+              rag_verified: 'Verified RAG (Proposed)',
+              baseline: 'Cloud Baseline (Gemini)',
+              ollama_baseline: 'Local Baseline (Ollama)',
+            }}
           />
           <Breakdown
             title="Safety and scope routing"

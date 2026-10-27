@@ -4,6 +4,8 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  Cloud,
+  Cpu,
   FlaskConical,
   Folder,
   FolderInput,
@@ -484,10 +486,10 @@ export default function Sidebar({
             </div>
           </div>
 
-          {/* Retrieval Mode Selector */}
+          {/* Execution Mode Selector */}
           <div>
             <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
-              Retrieval Mode
+              Execution Mode
             </div>
             <div className="rounded-xl border border-neutral-200/80 bg-white p-1 shadow-2xs space-y-1">
               <button
@@ -500,8 +502,8 @@ export default function Sidebar({
               >
                 <ShieldCheck size={15} className="mt-0.5 shrink-0 text-ocean" />
                 <div>
-                  <div className="text-xs font-bold leading-none">RAG + NLI</div>
-                  <div className="text-[10px] opacity-75 mt-0.5">Triad retrieval & checks</div>
+                  <div className="text-xs font-bold leading-none">Verified RAG (Proposed)</div>
+                  <div className="text-[10px] opacity-75 mt-0.5">Triad retrieval & NLI checks</div>
                 </div>
               </button>
               <button
@@ -512,10 +514,24 @@ export default function Sidebar({
                     : 'text-neutral-500 hover:bg-neutral-50'
                 }`}
               >
-                <FlaskConical size={15} className="mt-0.5 shrink-0 text-neutral-400" />
+                <Cloud size={15} className={`mt-0.5 shrink-0 ${mode === 'baseline' ? 'text-amber-600' : 'text-neutral-400'}`} />
                 <div>
-                  <div className="text-xs font-semibold leading-none">Baseline LLM</div>
-                  <div className="text-[10px] opacity-75 mt-0.5">No retrieval checks</div>
+                  <div className="text-xs font-semibold leading-none">Cloud Baseline (Gemini)</div>
+                  <div className="text-[10px] opacity-75 mt-0.5">Parametric zero-shot (No RAG)</div>
+                </div>
+              </button>
+              <button
+                onClick={() => setMode('ollama_baseline')}
+                className={`flex w-full items-start gap-2 rounded-lg p-2 text-left transition ${
+                  mode === 'ollama_baseline'
+                    ? 'bg-neutral-100 text-ink font-semibold'
+                    : 'text-neutral-500 hover:bg-neutral-50'
+                }`}
+              >
+                <Cpu size={15} className={`mt-0.5 shrink-0 ${mode === 'ollama_baseline' ? 'text-purple-600' : 'text-neutral-400'}`} />
+                <div>
+                  <div className="text-xs font-semibold leading-none">Local Baseline (Ollama)</div>
+                  <div className="text-[10px] opacity-75 mt-0.5">On-device zero-shot (Offline)</div>
                 </div>
               </button>
             </div>

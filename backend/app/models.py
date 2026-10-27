@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 class ChatMode(str, Enum):
     baseline = "baseline"
     rag_verified = "rag_verified"
+    ollama_baseline = "ollama_baseline"
 
 
 class Intent(str, Enum):
@@ -30,6 +31,7 @@ class ChatRequest(BaseModel):
     enable_live_pubmed: bool | None = None
     force_live_pubmed: bool | None = None
     history: list[dict[str, str]] = Field(default_factory=list)
+    question_id: str | None = None
 
 
 from .ddi.models import DDIReport

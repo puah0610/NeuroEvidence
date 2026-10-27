@@ -8,6 +8,10 @@ from app.safety import classify_query
     ("question", "intent"),
     [
         ("What are the motor symptoms of Parkinson's disease?", Intent.educational_in_scope),
+        ("Explain bradykinesia in simple terms without medical jargon.", Intent.educational_in_scope),
+        ("What is cogwheel rigidity?", Intent.educational_in_scope),
+        ("Explain resting tremor and postural instability.", Intent.educational_in_scope),
+        ("How does status epilepticus present?", Intent.educational_in_scope),
         ("How is focal epilepsy diagnosed using EEG?", Intent.educational_in_scope),
         ("Do I have epilepsy based on my symptoms?", Intent.personal_medical_advice),
         ("My father suddenly has facial drooping and cannot speak.", Intent.emergency),
@@ -19,6 +23,17 @@ from app.safety import classify_query
 )
 def test_query_classification(question: str, intent: Intent) -> None:
     assert classify_query(question).intent == intent
+
+
+def test_cardinal_symptom_topic_mapping() -> None:
+    dec = classify_query("Explain bradykinesia in simple terms without medical jargon.")
+    assert dec.intent == Intent.educational_in_scope
+    assert dec.topic == "Parkinson's disease"
+
+    dec_se = classify_query("What is the acute treatment for status epilepticus?")
+    assert dec_se.intent == Intent.educational_in_scope
+    assert dec_se.topic == "epilepsy"
+
 
 
 def test_conversational_memory_topic_inheritance() -> None:

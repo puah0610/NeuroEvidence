@@ -20,6 +20,13 @@ from typing import Any
 
 from .config import Settings
 from .models import RetrievedChunk, SubqueryResult
+from .tracing import start_span
+
+try:
+    from langfuse import get_client
+except ImportError:
+    def get_client():
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +97,23 @@ class QueryDecomposer:
         """Analyzes a question and selectively decomposes multi-part inquiries into 2 or 3 subqueries.
         Preserves clinical constraints (condition, medications) on all subqueries.
         """
+        lf_client = get_client()
+        with start_span(lf_client, "query_decomposition", as_type="task") as decomp_span:
+            plan = self._decompose_internal(question, topic)
+            if decomp_span:
+                try:
+                    decomp_span.update(
+                        metadata={
+                            "is_decomposed": plan.is_decomposed,
+                            "subqueries_count": len(plan.subqueries),
+                            "rationale": plan.rationale,
+                        }
+                    )
+                except Exception:
+                    pass
+            return plan
+
+    def _decompose_internal(self, question: str, topic: str | None = None) -> DecompositionPlan:
         if not getattr(self.settings, "enable_query_decomposition", True):
             return DecompositionPlan(
                 original_question=question,

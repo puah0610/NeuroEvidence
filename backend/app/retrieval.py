@@ -7,6 +7,13 @@ from typing import Protocol, Any, Callable
 from .config import Settings
 from .demo_corpus import DEMO_CHUNKS
 from .models import RetrievedChunk
+from .tracing import start_span
+
+try:
+    from langfuse import get_client
+except ImportError:
+    def get_client():
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +130,11 @@ class HyDEExpander:
             return question
         try:
             adapter = self._get_adapter()
+            timeout_sec = getattr(self.settings, "hyde_timeout_seconds", 8.0)
             output = adapter.generate_baseline(
-                f"{self._SYSTEM_PROMPT}\n\nQuestion: {question}"
+                f"{self._SYSTEM_PROMPT}\n\nQuestion: {question}",
+                name="query_expansion_hyde",
+                timeout=timeout_sec,
             )
             hypothetical = output.text.strip()
             # Safety check: if the LLM returns something very short or empty, fall back
@@ -403,76 +413,131 @@ class ChromaRetriever:
         if self.collection.count() == 0:
             return DemoRetriever(self.settings).search(question, topic)
 
-        dense_query = self._hyde.expand(question) if self._hyde else question
-        query_embedding = self.embedder.embed([dense_query])[0]
-        where = {"topic": topic} if topic else None
-        n_dense = min(self.settings.retrieval_top_k * 4, self.collection.count())
-        query_options = {
-            "query_embeddings": [query_embedding],
-            "n_results": n_dense,
-            "include": ["documents", "metadatas", "distances"],
-        }
-        if where:
-            query_options["where"] = where
-        result = self.collection.query(**query_options)
-        if not result["ids"] or not result["ids"][0]:
-            return DemoRetriever(self.settings).search(question, topic)
+        lf_client = get_client()
 
-        dense_list: list[tuple[float, RetrievedChunk]] = []
-        for chunk_id, text, metadata, distance in zip(
-            result["ids"][0],
-            result["documents"][0],
-            result["metadatas"][0],
-            result["distances"][0],
-            strict=True,
-        ):
-            chunk = _build_chunk(chunk_id, text, metadata, distance)
-            dense_list.append((max(0.0, 1.0 - float(distance)), chunk))
+        if self._hyde:
+            with start_span(lf_client, "query_expansion", as_type="task") as exp_span:
+                dense_query = self._hyde.expand(question)
+                if exp_span:
+                    try:
+                        exp_span.update(
+                            metadata={
+                                "method": "hyde",
+                                "expanded": dense_query != question,
+                                "passage_tokens": len(dense_query.split()),
+                            }
+                        )
+                    except Exception:
+                        pass
+        else:
+            dense_query = question
 
-        # Sparse scoring on retrieved candidate pool
-        query_tokens = _tokens(question)
-        sparse_query = _expand_sparse_tokens(query_tokens)
-        N = len(dense_list)
-        avg_len = sum(len(_tokens(c.excerpt)) for _, c in dense_list) / max(1, N)
+        with start_span(lf_client, "local_retrieval", as_type="retriever") as local_span:
+            query_embedding = self.embedder.embed([dense_query])[0]
+            where = {"topic": topic} if topic else None
+            n_dense = min(self.settings.retrieval_top_k * 4, self.collection.count())
+            query_options = {
+                "query_embeddings": [query_embedding],
+                "n_results": n_dense,
+                "include": ["documents", "metadatas", "distances"],
+            }
+            if where:
+                query_options["where"] = where
+            result = self.collection.query(**query_options)
+            if not result["ids"] or not result["ids"][0]:
+                return DemoRetriever(self.settings).search(question, topic)
 
-        doc_tokens_list: list[tuple[RetrievedChunk, Counter[str], int]] = []
-        doc_freqs: Counter[str] = Counter()
-        for _, chunk in dense_list:
-            header_tokens = _tokens(f"{chunk.title} {chunk.subtopic or ''} {chunk.section or ''}")
-            body_tokens = _tokens(chunk.excerpt)
-            combined = Counter(body_tokens)
-            for ht, cnt in header_tokens.items():
-                combined[ht] += cnt * 2
-            doc_tokens_list.append((chunk, combined, len(body_tokens)))
-            for t in set(combined.keys()):
-                doc_freqs[t] += 1
+            dense_list: list[tuple[float, RetrievedChunk]] = []
+            for chunk_id, text, metadata, distance in zip(
+                result["ids"][0],
+                result["documents"][0],
+                result["metadatas"][0],
+                result["distances"][0],
+                strict=True,
+            ):
+                chunk = _build_chunk(chunk_id, text, metadata, distance)
+                dense_list.append((max(0.0, 1.0 - float(distance)), chunk))
 
-        sparse_list: list[tuple[float, RetrievedChunk]] = []
-        for chunk, combined, body_len in doc_tokens_list:
-            score = _bm25_score(sparse_query, combined, avg_len, body_len, doc_freqs, N)
-            if chunk.chunk_id.startswith("TRIAD-"):
-                score *= 1.35
-            sparse_list.append((score, chunk))
+            # Sparse scoring on retrieved candidate pool
+            query_tokens = _tokens(question)
+            sparse_query = _expand_sparse_tokens(query_tokens)
+            N = len(dense_list)
+            avg_len = sum(len(_tokens(c.excerpt)) for _, c in dense_list) / max(1, N)
 
-        # Reciprocal Rank Fusion
-        fused = _reciprocal_rank_fusion(sparse_list, dense_list, k=60, alpha=0.5)
+            doc_tokens_list: list[tuple[RetrievedChunk, Counter[str], int]] = []
+            doc_freqs: Counter[str] = Counter()
+            for _, chunk in dense_list:
+                header_tokens = _tokens(f"{chunk.title} {chunk.subtopic or ''} {chunk.section or ''}")
+                body_tokens = _tokens(chunk.excerpt)
+                combined = Counter(body_tokens)
+                for ht, cnt in header_tokens.items():
+                    combined[ht] += cnt * 2
+                doc_tokens_list.append((chunk, combined, len(body_tokens)))
+                for t in set(combined.keys()):
+                    doc_freqs[t] += 1
+
+            sparse_list: list[tuple[float, RetrievedChunk]] = []
+            for chunk, combined, body_len in doc_tokens_list:
+                score = _bm25_score(sparse_query, combined, avg_len, body_len, doc_freqs, N)
+                if chunk.chunk_id.startswith("TRIAD-"):
+                    score *= 1.35
+                sparse_list.append((score, chunk))
+
+            # Reciprocal Rank Fusion
+            fused = _reciprocal_rank_fusion(sparse_list, dense_list, k=60, alpha=0.5)
+            if local_span:
+                try:
+                    local_span.update(
+                        metadata={
+                            "dense_candidates": len(dense_list),
+                            "fused_count": len(fused),
+                            "top_score": fused[0].relevance if fused else 0.0,
+                        }
+                    )
+                except Exception:
+                    pass
 
         # Neural Cross-Encoder Reranking
         candidate_pool = fused[: getattr(self.settings, "reranker_top_n", 20)]
-        if self._reranker is not None:
-            reranked = self._reranker.rerank(
-                question, candidate_pool, top_k=self.settings.retrieval_top_k * 2
-            )
-        else:
-            reranked = candidate_pool
+        with start_span(lf_client, "neural_reranking", as_type="evaluator") as rerank_span:
+            if self._reranker is not None:
+                reranked = self._reranker.rerank(
+                    question, candidate_pool, top_k=self.settings.retrieval_top_k * 2
+                )
+            else:
+                reranked = candidate_pool
+            if rerank_span:
+                try:
+                    rerank_span.update(
+                        metadata={
+                            "reranker_active": self._reranker is not None,
+                            "candidates_in": len(candidate_pool),
+                            "reranked_out": len(reranked),
+                        }
+                    )
+                except Exception:
+                    pass
 
-        parent_expanded = expand_to_parent_chunks(
-            reranked,
-            self.settings.retrieval_top_k,
-            self.settings.max_chunks_per_document,
-            corpus_lookup=self._chroma_parent_lookup,
-            token_budget=getattr(self.settings, "parent_expansion_token_budget", 750),
-        )
+        # Hierarchical Small-to-Big Parent Section Expansion
+        with start_span(lf_client, "parent_expansion", as_type="task") as parent_span:
+            parent_expanded = expand_to_parent_chunks(
+                reranked,
+                self.settings.retrieval_top_k,
+                self.settings.max_chunks_per_document,
+                corpus_lookup=self._chroma_parent_lookup,
+                token_budget=getattr(self.settings, "parent_expansion_token_budget", 750),
+            )
+            if parent_span:
+                try:
+                    parent_span.update(
+                        metadata={
+                            "output_chunks": len(parent_expanded),
+                            "token_budget": getattr(self.settings, "parent_expansion_token_budget", 750),
+                        }
+                    )
+                except Exception:
+                    pass
+
         return parent_expanded if parent_expanded else DemoRetriever(self.settings).search(question, topic)
 
     def _chroma_parent_lookup(self, target_chunk: RetrievedChunk) -> list[RetrievedChunk]:

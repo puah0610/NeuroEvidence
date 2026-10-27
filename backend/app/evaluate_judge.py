@@ -184,12 +184,16 @@ def compute_metrics(judged_results: list[dict[str, Any]]) -> dict[str, Any]:
         avg_cit_precision = sum(cit_prec_rows) / len(cit_prec_rows) if cit_prec_rows else None
 
         # Abstention accuracy on safety / unanswerable / out_of_scope
-        non_answerable = [r for r in mode_rows if r.get("category") in {"unanswerable", "out_of_scope", "personal_medical_advice"}]
+        non_answerable = [r for r in mode_rows if r.get("category") in {"unanswerable", "out_of_scope", "personal_medical_advice", "emergency"}]
         abstention_acc = (
             sum(r["appropriate_abstention_0_1"] for r in non_answerable) / len(non_answerable)
             if non_answerable
             else None
         )
+
+        from .evaluate_metrics import compute_abstention_confusion, compute_abstention_rates
+        conf = compute_abstention_confusion(mode_rows)
+        rates = compute_abstention_rates(conf)
 
         metrics[mode] = {
             "total_questions": n,
@@ -198,6 +202,9 @@ def compute_metrics(judged_results: list[dict[str, Any]]) -> dict[str, Any]:
             "avg_unsupported_claims_per_answer": round(avg_unsupported_count, 3),
             "mean_citation_precision": round(avg_cit_precision, 3) if avg_cit_precision is not None else "N/A",
             "abstention_accuracy": round(abstention_acc, 3) if abstention_acc is not None else "N/A",
+            "abstention_precision": rates["abstention_precision"],
+            "abstention_recall": rates["abstention_recall"],
+            "abstention_f1": rates["abstention_f1"],
         }
 
     return metrics
@@ -235,6 +242,15 @@ def format_comparison_table(metrics: dict[str, Any]) -> str:
     r_abs = rag.get("abstention_accuracy", "N/A")
     lines.append(f"| **Abstention Accuracy (Safety/OOS)** | {b_abs} | {r_abs} | Guardrail Enforced |")
 
+    # Formal Abstention Precision and Recall
+    b_prec = base.get("abstention_precision", "N/A")
+    r_prec = rag.get("abstention_precision", "N/A")
+    lines.append(f"| **Abstention Precision** | {b_prec} | {r_prec} | Refusal Precision |")
+
+    b_rec = base.get("abstention_recall", "N/A")
+    r_rec = rag.get("abstention_recall", "N/A")
+    lines.append(f"| **Abstention Recall** | {b_rec} | {r_rec} | Refusal Coverage |")
+
     return "\n".join(lines)
 
 
@@ -270,6 +286,12 @@ def run_judge(
         else None
     )
 
+    try:
+        from langfuse import get_client
+        lf_client = get_client() if getattr(settings, "langfuse_enabled", False) else None
+    except ImportError:
+        lf_client = None
+
     with traces_path.open("r", encoding="utf-8") as handle:
         items = [json.loads(line) for line in handle if line.strip()]
 
@@ -280,6 +302,37 @@ def run_judge(
         print(f"Judging {index}/{len(items)}: {item.get('question_id')} ({item.get('mode')})...", flush=True)
         res = judge_single_item(adapter, item)
         judged.append(res)
+
+        if lf_client and item.get("trace_id"):
+            try:
+                lf_client.create_score(
+                    trace_id=item["trace_id"],
+                    name="judge_correctness",
+                    value=res["correctness_0_2"],
+                    comment=res.get("notes", ""),
+                    data_type="NUMERIC",
+                )
+                lf_client.create_score(
+                    trace_id=item["trace_id"],
+                    name="judge_unsupported_claims",
+                    value=res["unsupported_claims"],
+                    data_type="NUMERIC",
+                )
+                if res.get("citation_precision_0_1") is not None:
+                    lf_client.create_score(
+                        trace_id=item["trace_id"],
+                        name="judge_citation_precision",
+                        value=res["citation_precision_0_1"],
+                        data_type="NUMERIC",
+                    )
+                lf_client.create_score(
+                    trace_id=item["trace_id"],
+                    name="judge_appropriate_abstention",
+                    value=res["appropriate_abstention_0_1"],
+                    data_type="NUMERIC",
+                )
+            except Exception as e:
+                logger.debug("Failed to push judge scores to Langfuse for trace %s: %s", item.get("trace_id"), e)
 
     output_csv_path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [

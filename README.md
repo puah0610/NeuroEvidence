@@ -122,7 +122,7 @@ NeuroEvidence includes three rigorous evaluation tracks designed for academic th
 
 ### Track 1: End-to-End RAG vs. Baseline & LLM-as-a-Judge
 
-Evaluate the locked 60-question evaluation set (`data/evaluation_questions.csv`) across both baseline LLM and grounded RAG modes:
+Evaluate the locked 37-question evaluation set (`data/evaluation_questions.csv` — 11 validation, 26 locked test) across both baseline LLM and grounded RAG modes:
 
 ```powershell
 $env:PYTHONPATH = "backend"
@@ -136,6 +136,11 @@ python -m app.evaluate --split validation --run-judge
 To run the judge independently on existing trace files:
 ```powershell
 python -m app.evaluate_judge --traces data/evaluation/results.jsonl --output-csv data/evaluation/judged_review.csv --judge-model gemini-2.5-pro
+```
+
+To compute non-parametric bootstrap 95% confidence intervals, formal abstention precision/recall, and paired significance statistics for dissertation reporting:
+```powershell
+python -m app.evaluate_metrics --judge-csv data/evaluation/judge_review.csv --traces data/evaluation/results.jsonl
 ```
 
 ### Track 2: 3-Pipeline Comparative Evaluation

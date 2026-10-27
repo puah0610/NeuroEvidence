@@ -58,6 +58,23 @@ async def test_bounded_answer_revision_workflow(service, database) -> None:
     assert response.mode == ChatMode.rag_verified
     assert response.citations
     assert response.claim_checks
+
+
+@pytest.mark.asyncio
+async def test_ollama_baseline_operates_without_retrieval(service, database) -> None:
+    response = await service.chat(
+        ChatRequest(
+            session_id="test-ollama-session",
+            question="What is Parkinson's disease?",
+            mode=ChatMode.ollama_baseline,
+        )
+    )
+    assert response.mode == ChatMode.ollama_baseline
+    assert response.citations == []
+    assert response.evidence_score is None
+    assert "Ollama" in response.warnings[0]
+    assert response.estimated_cost_usd == 0.0
+    assert "Main Topic:" in response.answer
     if response.original_answer is not None:
         assert response.answer != response.original_answer
         assert len(response.original_answer) > 0

@@ -47,6 +47,7 @@ def run(
                     "/api/chat",
                     json={
                         "session_id": f"evaluation-{split}",
+                        "question_id": row["question_id"],
                         "question": row["question"],
                         "mode": mode,
                     },

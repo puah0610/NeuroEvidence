@@ -5,13 +5,39 @@ from .models import Intent
 
 
 SUPPORTED_TERMS = {
+    # Parkinson's disease cardinal symptoms & clinical entities
     "parkinson": "Parkinson's disease",
     "parkinson's": "Parkinson's disease",
-    "epilepsy": "epilepsy",
-    "seizure": "epilepsy",
+    "parkinsonian": "Parkinson's disease",
+    "parkinsonism": "Parkinson's disease",
+    "bradykinesia": "Parkinson's disease",
+    "bradykinetic": "Parkinson's disease",
+    "hypokinesia": "Parkinson's disease",
+    "akinesia": "Parkinson's disease",
+    "rigidity": "Parkinson's disease",
+    "cogwheel": "Parkinson's disease",
+    "lead-pipe": "Parkinson's disease",
+    "resting tremor": "Parkinson's disease",
+    "rest tremor": "Parkinson's disease",
+    "postural instability": "Parkinson's disease",
+    "freezing of gait": "Parkinson's disease",
+    "festination": "Parkinson's disease",
+    "festinating": "Parkinson's disease",
+    "micrographia": "Parkinson's disease",
+    "dyskinesia": "Parkinson's disease",
+    "motor fluctuation": "Parkinson's disease",
+    "motor fluctuations": "Parkinson's disease",
+    "wearing off": "Parkinson's disease",
+    "wearing-off": "Parkinson's disease",
     "levodopa": "Parkinson's disease",
     "carbidopa": "Parkinson's disease",
+    "benserazide": "Parkinson's disease",
     "substantia nigra": "Parkinson's disease",
+    "striatum": "Parkinson's disease",
+    "striatal": "Parkinson's disease",
+    "lewy body": "Parkinson's disease",
+    "lewy bodies": "Parkinson's disease",
+    "alpha-synuclein": "Parkinson's disease",
     "hoehn": "Parkinson's disease",
     "deep brain stimulation": "Parkinson's disease",
     "dbs": "Parkinson's disease",
@@ -19,29 +45,81 @@ SUPPORTED_TERMS = {
     "mao-b": "Parkinson's disease",
     "maob": "Parkinson's disease",
     "ng71": "Parkinson's disease",
+    "selegiline": "Parkinson's disease",
+    "rasagiline": "Parkinson's disease",
+    "safinamide": "Parkinson's disease",
+    "entacapone": "Parkinson's disease",
+    "opicapone": "Parkinson's disease",
+    "tolcapone": "Parkinson's disease",
+    "pramipexole": "Parkinson's disease",
+    "ropinirole": "Parkinson's disease",
+    "rotigotine": "Parkinson's disease",
+    "apomorphine": "Parkinson's disease",
+    "amantadine": "Parkinson's disease",
+    "trihexyphenidyl": "Parkinson's disease",
+    "metoclopramide": "Parkinson's disease",
+    "haloperidol": "Parkinson's disease",
+    "dopamine agonist": "Parkinson's disease",
+    "dopaminergic": "Parkinson's disease",
+
+    # Epilepsy cardinal symptoms & clinical entities
+    "epilepsy": "epilepsy",
+    "epileptic": "epilepsy",
+    "seizure": "epilepsy",
+    "seizures": "epilepsy",
+    "status epilepticus": "epilepsy",
+    "absence seizure": "epilepsy",
+    "tonic-clonic": "epilepsy",
+    "myoclonic": "epilepsy",
+    "atonic": "epilepsy",
+    "focal seizure": "epilepsy",
+    "focal onset": "epilepsy",
+    "generalized seizure": "epilepsy",
     "sanad": "epilepsy",
     "ng217": "epilepsy",
+    "ilae": "epilepsy",
+    "electroencephal": "epilepsy",
+    "eeg": "epilepsy",
+    "antiseizure": "epilepsy",
+    "anticonvulsant": "epilepsy",
+    "epileptogenesis": "epilepsy",
+    "convulsion": "epilepsy",
+    "convulsions": "epilepsy",
+    "convulsive": "epilepsy",
+    "ictal": "epilepsy",
+    "postictal": "epilepsy",
+    "interictal": "epilepsy",
+    "spasm": "epilepsy",
+    "spasms": "epilepsy",
+    "infantile spasms": "epilepsy",
+    "iess": "epilepsy",
     "levetiracetam": "epilepsy",
     "lamotrigine": "epilepsy",
     "valproate": "epilepsy",
-    "ilae": "epilepsy",
-    "electroencephal": "epilepsy",
-    "antiseizure": "epilepsy",
     "carbamazepine": "epilepsy",
+    "oxcarbazepine": "epilepsy",
     "ethosuximide": "epilepsy",
-    "spasm": "epilepsy",
-    "infantile spasms": "epilepsy",
-    "iess": "epilepsy",
     "vigabatrin": "epilepsy",
     "acth": "epilepsy",
-    "selegiline": "Parkinson's disease",
-    "rasagiline": "Parkinson's disease",
-    "entacapone": "Parkinson's disease",
-    "metoclopramide": "Parkinson's disease",
-    "haloperidol": "Parkinson's disease",
-    "pramipexole": "Parkinson's disease",
-    "ropinirole": "Parkinson's disease",
+    "topiramate": "epilepsy",
+    "zonisamide": "epilepsy",
+    "clobazam": "epilepsy",
+    "lacosamide": "epilepsy",
+    "brivaracetam": "epilepsy",
+    "cannabidiol": "epilepsy",
+    "epidiolex": "epilepsy",
+    "dravet": "epilepsy",
+    "lennox-gastaut": "epilepsy",
+    "west syndrome": "epilepsy",
 }
+
+
+def _term_matches(term: str, text: str) -> bool:
+    """Match term in normalized text. Use whole-word regex for short acronyms/terms."""
+    if len(term) <= 3:
+        return bool(re.search(r"\b" + re.escape(term.strip()) + r"\b", text))
+    return term in text
+
 
 EMERGENCY_PATTERNS = (
     r"\b(?:face|facial) droop(?:ing)?\b",
@@ -149,7 +227,7 @@ def extract_active_topic_from_history(history: list[dict[str, str]] | None) -> s
             continue
         norm = f" {content.lower()} "
         hist_topic = next(
-            (label for term, label in SUPPORTED_TERMS.items() if term in norm), None
+            (label for term, label in SUPPORTED_TERMS.items() if _term_matches(term, norm)), None
         )
         if hist_topic:
             return hist_topic
@@ -179,7 +257,7 @@ def classify_query(
         )
 
     topic = next(
-        (label for term, label in SUPPORTED_TERMS.items() if term in normalized), None
+        (label for term, label in SUPPORTED_TERMS.items() if _term_matches(term, normalized)), None
     )
 
     # Conversational memory: Inherit active topic for contextual follow-up inquiries

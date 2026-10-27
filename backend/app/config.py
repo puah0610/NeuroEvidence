@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     llm_provider: str = "gemini"
     gemini_api_key: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
-    gemini_generation_model: str = "gemini-3.8-flash"
+    gemini_generation_model: str = "models/gemini-3.1-flash-lite"
     gemini_judge_model: str = "gemini-2.5-pro"
     gemini_embedding_model: str = "gemini-embedding-001"
     gemini_input_cost_per_million: float = Field(default=0.0, ge=0)
@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     openai_generation_model: str = "gpt-4.1-mini-2025-04-14"
     openai_judge_model: str = "gpt-4o"
     openai_embedding_model: str = "text-embedding-3-small"
+    ollama_base_url: str = "http://localhost:11434/v1"
+    ollama_model: str = "llama3.1:8b"
     generation_input_cost_per_million: float = Field(default=0.40, ge=0)
     generation_output_cost_per_million: float = Field(default=1.60, ge=0)
     llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
@@ -48,6 +50,8 @@ class Settings(BaseSettings):
     reranker_top_n: int = Field(default=20, ge=5, le=50)
     enable_hyde: bool = True
     hyde_max_tokens: int = Field(default=150, ge=30, le=500)
+    hyde_timeout_seconds: float = Field(default=8.0, ge=2.0, le=30.0)
+    pipeline_version: str = "triad-rag-v2.1"
     parent_expansion_token_budget: int = Field(default=750, ge=200, le=2500)
     enable_bounded_answer_revision: bool = Field(default=True)
     enable_query_decomposition: bool = Field(default=True)

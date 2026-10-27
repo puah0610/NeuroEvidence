@@ -54,7 +54,7 @@ def test_user_example_question_decomposition():
 
 
 def test_retrieve_with_decomposition_deduplication():
-    settings = Settings(enable_query_decomposition=True, retrieval_top_k=5)
+    settings = Settings(enable_query_decomposition=True, retrieval_top_k=5, enable_hyde=False)
     decomposer = QueryDecomposer(settings)
     retriever = DemoRetriever(settings)
 
@@ -133,6 +133,8 @@ async def test_full_service_decomposition_integration(tmp_path):
         demo_mode=True,
         enable_query_decomposition=True,
         enable_bounded_answer_revision=True,
+        enable_hyde=False,
+        enable_live_pubmed_fallback=False,
     )
     service = ChatService(settings, database)
 

@@ -18,7 +18,13 @@ from .models import RetrievedChunk
 class Generator(Protocol):
     model_name: str
 
-    def generate_baseline(self, question: str) -> "GenerationOutput": ...
+    def generate_baseline(
+        self,
+        question: str,
+        name: str = "baseline_answer_generation",
+        timeout: float | None = None,
+        **kwargs: Any,
+    ) -> "GenerationOutput": ...
 
     def generate_grounded(
         self,
@@ -28,6 +34,9 @@ class Generator(Protocol):
         unanswered_parts: list[str] | None = None,
         has_adversarial_fabrication: bool = False,
         history: list[dict[str, str]] | None = None,
+        name: str = "grounded_answer_generation",
+        timeout: float | None = None,
+        **kwargs: Any,
     ) -> "GenerationOutput": ...
 
     def revise_grounded(
@@ -40,6 +49,9 @@ class Generator(Protocol):
         unanswered_parts: list[str] | None = None,
         has_adversarial_fabrication: bool = False,
         history: list[dict[str, str]] | None = None,
+        name: str = "grounded_answer_revision",
+        timeout: float | None = None,
+        **kwargs: Any,
     ) -> "GenerationOutput": ...
 
 
@@ -155,6 +167,24 @@ def _format_revision_prompt(
     return system_instruction, user_prompt
 
 
+def _build_baseline_system_prompt(is_local: bool = False) -> str:
+    baseline_type = "local open-source" if is_local else "cloud parametric"
+    return (
+        "You are an educational neurology clinical assistant for students and researchers.\n"
+        "Provide a comprehensive, in-depth academic answer that explains mechanisms thoroughly.\n\n"
+        "Formatting Rules:\n"
+        "1. Begin with a '### Main Topic: <Condition/Subject Focus>' heading.\n"
+        "2. Provide a clear 1-2 sentence direct answer addressing the user's question upfront.\n"
+        "3. Include a '#### Core Clinical Concepts:' section with detailed, informative points (using '• **<Concept Title>:** <comprehensive explanatory text>').\n"
+        "   - Elaborate on neurobiological and pathophysiological mechanisms.\n"
+        "   - Detail clinical presentations, semiology, and diagnostic criteria.\n"
+        "   - Discuss evidence-based management principles, pharmacological classes, and clinical trade-offs.\n"
+        "   - Do not write overly brief 1-line bullet points; provide sufficient scientific and clinical context for each point.\n"
+        "4. NEVER use LaTeX syntax or math dollar signs (do NOT write '$\\alpha$' or '$SNpc$'). Always use clean standard Unicode text and medical terms (e.g. write 'alpha-synuclein' or 'α-synuclein', 'SNpc', 'TRAP').\n"
+        f"5. Do not provide individual patient diagnoses or prescriptions. This is an ungrounded {baseline_type} research baseline: do not invent citations and do not claim to have checked external sources."
+    )
+
+
 class OpenAIAdapter:
     def __init__(self, settings: Settings, model_name: str | None = None):
         self.settings = settings
@@ -167,22 +197,24 @@ class OpenAIAdapter:
         )
         return [item.embedding for item in result.data]
 
-    def generate_baseline(self, question: str) -> GenerationOutput:
-        response = self.client.responses.create(
-            model=self.model_name,
-            instructions=(
-                "You are an educational neurology clinical assistant for students and researchers. "
-                "Answer clearly and directly like an intelligent assistant, providing a direct answer upfront followed by core clinical concepts.\n\n"
-                "Formatting Rules:\n"
-                "1. Begin with a '### Main Topic: <Condition/Subject Focus>' heading.\n"
-                "2. Provide a 1-2 sentence direct answer addressing the user's question upfront (e.g. core distinction, mechanism, or consensus summary).\n"
-                "3. Include a '#### Core Clinical Concepts:' section with structured bullet points (using '• **<Concept Title>:** <details and mechanisms>').\n"
-                "4. Do not diagnose or prescribe, and state uncertainty. This is the plain-LLM "
-                "research baseline: do not invent citations and do not claim to have checked external sources."
-            ),
-            input=question,
-            temperature=self.settings.llm_temperature,
-        )
+    def generate_baseline(
+        self,
+        question: str,
+        name: str = "baseline_answer_generation",
+        timeout: float | None = None,
+        **kwargs: Any,
+    ) -> GenerationOutput:
+        call_kwargs: dict[str, Any] = {
+            "model": self.model_name,
+            "instructions": _build_baseline_system_prompt(is_local=False),
+            "input": question,
+            "temperature": self.settings.llm_temperature,
+        }
+        if timeout:
+            call_kwargs["timeout"] = timeout
+        if "langfuse" in self.client.__class__.__module__:
+            call_kwargs["name"] = name
+        response = self.client.responses.create(**call_kwargs)
         return self._result(response)
 
     def generate_grounded(
@@ -193,6 +225,9 @@ class OpenAIAdapter:
         unanswered_parts: list[str] | None = None,
         has_adversarial_fabrication: bool = False,
         history: list[dict[str, str]] | None = None,
+        name: str = "grounded_answer_generation",
+        timeout: float | None = None,
+        **kwargs: Any,
     ) -> GenerationOutput:
         evidence = "\n\n".join(
             f"[S{index}] [{chunk.layer_name} | {chunk.layer_source} | Year: {chunk.year or 'Unspecified'}] {chunk.title} — {chunk.section or 'Excerpt'}\n{chunk.excerpt}"
@@ -220,9 +255,9 @@ class OpenAIAdapter:
                 "'I cannot invent fictional references or bypass evidence grounding requirements. Based on verified clinical literature, ...' "
                 "and then address the underlying educational topic accurately using retrieved evidence."
             )
-        response = self.client.responses.create(
-            model=self.model_name,
-            instructions=(
+        call_kwargs: dict[str, Any] = {
+            "model": self.model_name,
+            "instructions": (
                 "You are an educational neurology clinical assistant utilizing a 3-Layer Triad Knowledge Base "
                 "(Layer 1: Foundational Knowledge from NCBI Bookshelf/StatPearls; Layer 2: Clinical Guidelines "
                 "from NICE Guidelines; Layer 3: Empirical Evidence & Trials from PubMed Central/Cochrane).\n\n"
@@ -276,9 +311,14 @@ class OpenAIAdapter:
                 f"{adversarial_instruction}\n"
                 "Never cite a marker that is not supplied. Do not diagnose or prescribe."
             ),
-            input=f"{_format_conversation_history(history)}QUESTION\n{question}\n\nEVIDENCE\n{evidence}",
-            temperature=self.settings.llm_temperature,
-        )
+            "input": f"{_format_conversation_history(history)}QUESTION\n{question}\n\nEVIDENCE\n{evidence}",
+            "temperature": self.settings.llm_temperature,
+        }
+        if timeout:
+            call_kwargs["timeout"] = timeout
+        if "langfuse" in self.client.__class__.__module__:
+            call_kwargs["name"] = name
+        response = self.client.responses.create(**call_kwargs)
         return self._result(response)
 
     def revise_grounded(
@@ -291,6 +331,9 @@ class OpenAIAdapter:
         unanswered_parts: list[str] | None = None,
         has_adversarial_fabrication: bool = False,
         history: list[dict[str, str]] | None = None,
+        name: str = "grounded_answer_revision",
+        timeout: float | None = None,
+        **kwargs: Any,
     ) -> GenerationOutput:
         system_instruction, user_prompt = _format_revision_prompt(
             question,
@@ -302,12 +345,17 @@ class OpenAIAdapter:
             has_adversarial_fabrication=has_adversarial_fabrication,
             history=history,
         )
-        response = self.client.responses.create(
-            model=self.model_name,
-            instructions=system_instruction,
-            input=user_prompt,
-            temperature=self.settings.llm_temperature,
-        )
+        call_kwargs: dict[str, Any] = {
+            "model": self.model_name,
+            "instructions": system_instruction,
+            "input": user_prompt,
+            "temperature": self.settings.llm_temperature,
+        }
+        if timeout:
+            call_kwargs["timeout"] = timeout
+        if "langfuse" in self.client.__class__.__module__:
+            call_kwargs["name"] = name
+        response = self.client.responses.create(**call_kwargs)
         return self._result(response)
 
     @staticmethod
@@ -380,14 +428,14 @@ class GeminiAdapter:
         raise RuntimeError("Failed to compute embeddings after maximum rate limit retries.")
 
     def _call_with_retry(self, **kwargs):
-        if GeminiAdapter._quota_exhausted:
-            raise RuntimeError("Gemini API quota is currently exhausted for this key.")
-
         models_to_try = [self.model_name]
         fallback_candidates = (
             ["models/gemini-pro-latest", "models/gemini-3.1-pro-preview"]
             if "pro" in self.model_name.lower()
             else [
+                "models/gemini-3.1-flash-lite",
+                "models/gemini-3.1-flash-lite-preview",
+                "models/gemini-3-flash-preview",
                 "models/gemini-3.5-flash-lite",
                 "models/gemini-flash-lite-latest",
                 "models/gemini-3.5-flash",
@@ -401,18 +449,25 @@ class GeminiAdapter:
                 models_to_try.append(candidate)
 
         last_exc = None
-        has_quota_error = False
+        call_kwargs = dict(kwargs)
+        # langfuse.openai handles `name` automatically; native openai client does not
+        if "name" in call_kwargs and "langfuse" not in self.client.__class__.__module__:
+            call_kwargs.pop("name")
+
+        # Bound per-model attempt timeout so an unresponsive/overloaded model fails over quickly
+        per_candidate_timeout = min(call_kwargs.get("timeout") or 12.0, 12.0)
+        call_kwargs["timeout"] = per_candidate_timeout
+
         for model in models_to_try:
-            kwargs["model"] = model
+            call_kwargs["model"] = model
             try:
-                response = self.client.chat.completions.create(**kwargs)
+                response = self.client.chat.completions.create(**call_kwargs)
                 self.model_name = model
                 return response
             except Exception as exc:
                 last_exc = exc
                 err_msg = str(exc).lower()
                 if "429" in err_msg or "resource_exhausted" in err_msg or "quota" in err_msg:
-                    has_quota_error = True
                     logger.warning("Gemini model %s quota reached (429); checking alternative model with separate quota...", model)
                 elif "503" in err_msg or "unavailable" in err_msg:
                     logger.warning("Gemini model %s temporarily busy (503); trying next model candidate...", model)
@@ -420,33 +475,31 @@ class GeminiAdapter:
                     logger.warning("Gemini model %s request timed out; trying next model candidate...", model)
                 else:
                     logger.warning("Gemini model %s encountered error: %s. Falling back...", model, exc)
-                time.sleep(0.3)
+                time.sleep(0.2)
                 continue
         if last_exc:
-            if has_quota_error:
-                GeminiAdapter._quota_exhausted = True
             raise last_exc
 
-    def generate_baseline(self, question: str) -> GenerationOutput:
-        system_instruction = (
-            "You are an educational neurology clinical assistant for students and researchers.\n"
-            "Answer clearly and directly like an intelligent assistant, providing a direct answer upfront followed by core clinical concepts.\n\n"
-            "Formatting Rules:\n"
-            "1. Begin with a '### Main Topic: <Condition/Subject Focus>' heading.\n"
-            "2. Provide a 1-2 sentence direct answer addressing the user's question upfront (e.g. core distinction, mechanism, or consensus summary).\n"
-            "3. Include a '#### Core Clinical Concepts:' section with structured bullet points (using '• **<Concept Title>:** <details and mechanisms>').\n"
-            "   If providing sub-points under a concept, indent them clearly under the concept.\n"
-            "4. NEVER use LaTeX syntax or math dollar signs (do NOT write '$\\alpha$' or '$SNpc$'). Always use clean standard Unicode text and medical terms (e.g. write 'alpha-synuclein' or 'α-synuclein', 'SNpc', 'TRAP').\n"
-            "5. Do not diagnose or prescribe, and state uncertainty. This is the plain-LLM research baseline: do not invent citations and do not claim to have checked external sources."
-        )
+    def generate_baseline(
+        self,
+        question: str,
+        name: str = "baseline_answer_generation",
+        timeout: float | None = None,
+        **kwargs: Any,
+    ) -> GenerationOutput:
+        system_instruction = _build_baseline_system_prompt(is_local=False)
         try:
-            response = self._call_with_retry(
-                messages=[
+            call_kwargs: dict[str, Any] = {
+                "messages": [
                     {"role": "system", "content": system_instruction},
                     {"role": "user", "content": question},
                 ],
-                temperature=self.settings.llm_temperature,
-            )
+                "temperature": self.settings.llm_temperature,
+                "name": name,
+            }
+            if timeout:
+                call_kwargs["timeout"] = timeout
+            response = self._call_with_retry(**call_kwargs)
             return self._result(response)
         except Exception as exc:
             logger.warning("Gemini generate_baseline failed (%s); using fallback generator.", exc)
@@ -460,6 +513,9 @@ class GeminiAdapter:
         unanswered_parts: list[str] | None = None,
         has_adversarial_fabrication: bool = False,
         history: list[dict[str, str]] | None = None,
+        name: str = "grounded_answer_generation",
+        timeout: float | None = None,
+        **kwargs: Any,
     ) -> GenerationOutput:
         evidence = "\n\n".join(
             f"[S{index}] [{chunk.layer_name} | {chunk.layer_source} | Year: {chunk.year or 'Unspecified'}] {chunk.title} — {chunk.section or 'Excerpt'}\n{chunk.excerpt}"
@@ -554,10 +610,14 @@ class GeminiAdapter:
             {"role": "user", "content": f"QUESTION\n{question}\n\nEVIDENCE\n{evidence}"}
         )
         try:
-            response = self._call_with_retry(
-                messages=messages,
-                temperature=self.settings.llm_temperature,
-            )
+            call_kwargs: dict[str, Any] = {
+                "messages": messages,
+                "temperature": self.settings.llm_temperature,
+                "name": name,
+            }
+            if timeout:
+                call_kwargs["timeout"] = timeout
+            response = self._call_with_retry(**call_kwargs)
             return self._result(response)
         except Exception as exc:
             logger.warning("Gemini generate_grounded failed (%s); using fallback generator.", exc)
@@ -575,6 +635,9 @@ class GeminiAdapter:
         unanswered_parts: list[str] | None = None,
         has_adversarial_fabrication: bool = False,
         history: list[dict[str, str]] | None = None,
+        name: str = "grounded_answer_revision",
+        timeout: float | None = None,
+        **kwargs: Any,
     ) -> GenerationOutput:
         system_instruction, user_prompt = _format_revision_prompt(
             question,
@@ -587,13 +650,17 @@ class GeminiAdapter:
             history=history,
         )
         try:
-            response = self._call_with_retry(
-                messages=[
+            call_kwargs: dict[str, Any] = {
+                "messages": [
                     {"role": "system", "content": system_instruction},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=self.settings.llm_temperature,
-            )
+                "temperature": self.settings.llm_temperature,
+                "name": name,
+            }
+            if timeout:
+                call_kwargs["timeout"] = timeout
+            response = self._call_with_retry(**call_kwargs)
             return self._result(response)
         except Exception as exc:
             logger.warning("Gemini revise_grounded failed (%s); using fallback generator.", exc)
@@ -632,6 +699,61 @@ def clean_medical_text(text: str) -> str:
     return cleaned
 
 
+class OllamaAdapter:
+    def __init__(self, settings: Settings, model_name: str | None = None):
+        self.settings = settings
+        self.model_name = model_name or getattr(settings, "ollama_model", "llama3.1:8b")
+        self.base_url = getattr(settings, "ollama_base_url", "http://localhost:11434/v1")
+        self.client = OpenAI(
+            api_key="ollama",
+            base_url=self.base_url,
+            timeout=45.0,
+            max_retries=1,
+        )
+
+    def generate_baseline(
+        self,
+        question: str,
+        name: str = "ollama_baseline_generation",
+        timeout: float | None = None,
+        **kwargs: Any,
+    ) -> GenerationOutput:
+        system_instruction = _build_baseline_system_prompt(is_local=True)
+        call_kwargs: dict[str, Any] = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": question},
+            ],
+            "temperature": self.settings.llm_temperature,
+        }
+        if timeout:
+            call_kwargs["timeout"] = timeout
+        try:
+            response = self.client.chat.completions.create(**call_kwargs)
+            choice = response.choices[0]
+            text = (choice.message.content or "").strip()
+            text = clean_medical_text(text)
+            usage = getattr(response, "usage", None)
+            return GenerationOutput(
+                text=text,
+                input_tokens=int(getattr(usage, "prompt_tokens", 0) or 0),
+                output_tokens=int(getattr(usage, "completion_tokens", 0) or 0),
+            )
+        except Exception as exc:
+            logger.warning("Ollama generate_baseline failed (%s); using informative fallback.", exc)
+            topic = _topic_label(question)
+            fallback_text = (
+                f"### Main Topic: {topic} (Local Llama 3 Baseline)\n\n"
+                f"{topic} evaluation and clinical management require structured diagnostic workup and evidence-based symptomatic therapy.\n\n"
+                "#### Core Clinical Concepts:\n"
+                f"• **On-Device Parametric Baseline:** This output represents the local baseline model ({self.model_name}) operating without retrieval or NLI verification.\n"
+                "• **Parametric Knowledge Limits:** Without active retrieval grounding, open-source on-device models rely solely on internal weights and cannot verify citations against indexed literature.\n\n"
+                f"*(Note: Live connection to Ollama at {self.base_url} was unavailable: {exc}. To enable live on-device inference, launch Ollama with `ollama run {self.model_name}`).*"
+            )
+            return GenerationOutput(text=fallback_text, input_tokens=0, output_tokens=0)
+
+
 def create_llm_adapter(settings: Settings, model_name: str | None = None) -> OpenAIAdapter | GeminiAdapter:
     if settings.llm_provider.lower() == "gemini":
         return GeminiAdapter(settings, model_name=model_name)
@@ -641,7 +763,7 @@ def create_llm_adapter(settings: Settings, model_name: str | None = None) -> Ope
 class DemoGenerator:
     model_name = "bundled-demo-generator"
 
-    def generate_baseline(self, question: str) -> GenerationOutput:
+    def generate_baseline(self, question: str, **kwargs: Any) -> GenerationOutput:
         topic = _topic_label(question)
         lines = [
             f"### Main Topic: {topic} (Baseline Overview)",
@@ -663,6 +785,7 @@ class DemoGenerator:
         unanswered_parts: list[str] | None = None,
         has_adversarial_fabrication: bool = False,
         history: list[dict[str, str]] | None = None,
+        **kwargs: Any,
     ) -> GenerationOutput:
         if not chunks:
             return GenerationOutput("The indexed collection does not contain enough evidence to answer this question.")
@@ -745,6 +868,7 @@ class DemoGenerator:
         unanswered_parts: list[str] | None = None,
         has_adversarial_fabrication: bool = False,
         history: list[dict[str, str]] | None = None,
+        **kwargs: Any,
     ) -> GenerationOutput:
         from .verification import sync_answer_citations
 

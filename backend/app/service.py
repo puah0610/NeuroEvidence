@@ -19,7 +19,7 @@ from .database import Database
 from .ddi.checker import get_ddi_checker
 import re
 from .decomposition import QueryDecomposer, retrieve_with_decomposition
-from .llm import DemoGenerator, Generator, create_llm_adapter
+from .llm import DemoGenerator, Generator, OllamaAdapter, create_llm_adapter
 from .live_pubmed import LivePubMedRetriever
 from .models import ChatRequest, ChatResponse, Intent
 from .retrieval import ChromaRetriever, DemoRetriever, TransformerDenseEmbedder
@@ -116,6 +116,7 @@ class ChatService:
         self.nli = make_nli(settings)
         self.decomposer = QueryDecomposer(settings, self.generator)
         self.live_pubmed = LivePubMedRetriever(settings, self.generator)
+        self.ollama_adapter = OllamaAdapter(settings)
 
     @observe(name="chat_pipeline")
     async def chat(self, request: ChatRequest) -> ChatResponse:
@@ -127,6 +128,8 @@ class ChatService:
                 lf_client.update_current_span(
                     metadata={
                         "session_id": request.session_id,
+                        "question_id": request.question_id,
+                        "pipeline_version": getattr(self.settings, "pipeline_version", "triad-rag-v2.1"),
                         "mode": request.mode.value,
                         "demo_mode": self.settings.demo_mode,
                         "llm_provider": self.settings.llm_provider,
@@ -138,6 +141,20 @@ class ChatService:
         decision = classify_query(request.question, history=history)
 
         if decision.intent != Intent.educational_in_scope:
+            if lf_client:
+                try:
+                    lf_client.update_current_span(
+                        metadata={
+                            "question_id": request.question_id,
+                            "pipeline_version": getattr(self.settings, "pipeline_version", "triad-rag-v2.1"),
+                            "model": "safety-rules-v1",
+                            "decision": "abstained",
+                            "nli_action": "safety_abstention",
+                            "retrieved_source_ids": [],
+                        }
+                    )
+                except Exception:
+                    pass
             result = ChatResponse(
                 trace_id=trace_id,
                 intent=decision.intent,
@@ -155,6 +172,20 @@ class ChatService:
         if request.mode.value == "baseline":
             generation = self.generator.generate_baseline(request.question)
             answer = generation.text
+            if lf_client:
+                try:
+                    lf_client.update_current_span(
+                        metadata={
+                            "question_id": request.question_id,
+                            "pipeline_version": getattr(self.settings, "pipeline_version", "triad-rag-v2.1"),
+                            "model": self.generator.model_name,
+                            "decision": "answered",
+                            "nli_action": "baseline_unverified",
+                            "retrieved_source_ids": [],
+                        }
+                    )
+                except Exception:
+                    pass
             result = ChatResponse(
                 trace_id=trace_id,
                 intent=decision.intent,
@@ -166,6 +197,40 @@ class ChatService:
                 input_tokens=generation.input_tokens,
                 output_tokens=generation.output_tokens,
                 estimated_cost_usd=self._cost(generation.input_tokens, generation.output_tokens),
+                demo_mode=self.settings.demo_mode,
+                created_at=datetime.now(UTC),
+            )
+            self.database.save_trace(request.session_id, request.question, result)
+            return result
+
+        if request.mode.value == "ollama_baseline":
+            generation = self.ollama_adapter.generate_baseline(request.question)
+            answer = generation.text
+            if lf_client:
+                try:
+                    lf_client.update_current_span(
+                        metadata={
+                            "question_id": request.question_id,
+                            "pipeline_version": getattr(self.settings, "pipeline_version", "triad-rag-v2.1"),
+                            "model": self.ollama_adapter.model_name,
+                            "decision": "answered",
+                            "nli_action": "ollama_baseline_unverified",
+                            "retrieved_source_ids": [],
+                        }
+                    )
+                except Exception:
+                    pass
+            result = ChatResponse(
+                trace_id=trace_id,
+                intent=decision.intent,
+                mode=request.mode,
+                answer=answer,
+                warnings=["Local Ollama baseline operates on-device without retrieval verification."],
+                latency_ms=_elapsed_ms(started),
+                model=self.ollama_adapter.model_name,
+                input_tokens=generation.input_tokens,
+                output_tokens=generation.output_tokens,
+                estimated_cost_usd=0.0,
                 demo_mode=self.settings.demo_mode,
                 created_at=datetime.now(UTC),
             )
@@ -256,7 +321,7 @@ class ChatService:
         )
 
         if should_trigger_live_pubmed:
-            with start_span(lf_client, "live_pubmed_fallback", as_type="tool") as live_span:
+            with start_span(lf_client, "live_pubmed_search", as_type="tool") as live_span:
                 try:
                     live_chunks, live_query = await self.live_pubmed.search_and_rerank(
                         effective_query,
@@ -329,6 +394,20 @@ class ChatService:
                 unanswered_parts.append(temporal_unanswered)
 
         if not chunks:
+            if lf_client:
+                try:
+                    lf_client.update_current_span(
+                        metadata={
+                            "question_id": request.question_id,
+                            "pipeline_version": getattr(self.settings, "pipeline_version", "triad-rag-v2.1"),
+                            "model": self.generator.model_name,
+                            "decision": "abstained",
+                            "nli_action": "abstained_no_evidence",
+                            "retrieved_source_ids": [],
+                        }
+                    )
+                except Exception:
+                    pass
             answer = (
                 "The indexed collection does not contain enough evidence to answer this question. "
                 "Try a narrower question within the supported topic."
@@ -396,6 +475,9 @@ class ChatService:
             chunks = verification.chunks
         answer = original_answer
 
+        initial_evidence_score = verification.evidence_score
+        initial_claims = list(verification.claims)
+
         # Determine if Bounded Answer Revision is required:
         has_contradiction = any(item.label.value == "contradicted" for item in verification.claims)
         has_insufficient = any(item.label.value == "insufficient" for item in verification.claims)
@@ -409,6 +491,10 @@ class ChatService:
             getattr(self.settings, "enable_bounded_answer_revision", True)
             and (has_contradiction or has_insufficient or has_citation_updates or below_threshold)
         )
+
+        nli_action = "accepted_unmodified"
+        if not getattr(self.settings, "enable_bounded_answer_revision", True) and (has_contradiction or has_insufficient or below_threshold):
+            nli_action = "warning_only"
 
         if needs_revision:
             # Step 4: Revise unsupported claims and inline citations
@@ -439,9 +525,35 @@ class ChatService:
                     enable_cross_chunk_fallback=self.settings.enable_cross_chunk_fallback,
                     enable_corrective_retrieval=False,
                 )
+                supp_count = sum(1 for c in revised_verification.claims if c.label.value == "supported")
+                contra_count = sum(1 for c in revised_verification.claims if c.label.value == "contradicted")
+                insuff_count = sum(1 for c in revised_verification.claims if c.label.value == "insufficient")
+                resolved_claims = max(
+                    0,
+                    sum(1 for c in initial_claims if c.label.value != "supported")
+                    - (contra_count + insuff_count),
+                )
                 if rev_span:
                     try:
-                        rev_span.update(metadata={"evidence_score": revised_verification.evidence_score})
+                        rev_span.update(
+                            metadata={
+                                "pre_revision_evidence_score": initial_evidence_score,
+                                "post_revision_evidence_score": revised_verification.evidence_score,
+                                "claims_count": len(revised_verification.claims),
+                                "supported": supp_count,
+                                "contradicted": contra_count,
+                                "insufficient": insuff_count,
+                                "unsupported_claims_resolved": resolved_claims,
+                                "claims_checked": [
+                                    {
+                                        "claim": c.claim[:120],
+                                        "label": c.label.value,
+                                        "citations": c.citation_markers,
+                                    }
+                                    for c in revised_verification.claims[:5]
+                                ],
+                            }
+                        )
                     except Exception:
                         pass
 
@@ -452,12 +564,23 @@ class ChatService:
             if verification.evidence_score < self.settings.evidence_threshold or any(
                 item.label.value == "contradicted" for item in verification.claims
             ):
+                nli_action = "revised_with_evidence_gap_warning"
                 if "evidence gap" not in answer.lower():
                     answer = (
                         "The retrieved clinical material was not strong enough to produce a fully verified answer. "
                         "The revised draft and its verification details are retained below for research inspection.\n\n"
                         + answer
                     )
+            else:
+                nli_action = "revised_and_verified"
+
+        is_abstention = (
+            "cannot be answered" in answer.lower()
+            or "not strong enough" in answer.lower()
+            or "no indexed evidence" in answer.lower()
+            or decision.intent != Intent.educational_in_scope
+        )
+        decision_label = "abstained" if is_abstention else "answered"
 
         layer_dist: dict[str, int] = {}
         for citation in verification.citations:
@@ -475,10 +598,22 @@ class ChatService:
 
         if lf_client:
             try:
+                lf_client.update_current_span(
+                    metadata={
+                        "question_id": request.question_id,
+                        "pipeline_version": getattr(self.settings, "pipeline_version", "triad-rag-v2.1"),
+                        "model": self.generator.model_name,
+                        "retrieved_source_ids": [c.source_id for c in chunks],
+                        "decision": decision_label,
+                        "nli_action": nli_action,
+                        "evidence_score": verification.evidence_score,
+                        "live_pubmed_triggered": live_pubmed_triggered,
+                    }
+                )
                 lf_client.score_current_trace(
                     name="evidence_score",
                     value=verification.evidence_score,
-                    comment=f"Evidence Threshold: {self.settings.evidence_threshold}",
+                    comment=f"Evidence Threshold: {self.settings.evidence_threshold} | Action: {nli_action}",
                     data_type="NUMERIC",
                 )
             except Exception:

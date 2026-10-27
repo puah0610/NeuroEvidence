@@ -219,6 +219,16 @@ function AssistantMessageCard({ result }) {
             Demo Corpus
           </span>
         )}
+        {result.mode === 'baseline' && (
+          <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+            Cloud Baseline (Gemini)
+          </span>
+        )}
+        {result.mode === 'ollama_baseline' && (
+          <span className="rounded-full bg-purple-50 border border-purple-200 px-2 py-0.5 text-[10px] font-bold text-purple-800">
+            Local Baseline (Ollama)
+          </span>
+        )}
         {result.citations?.length > 0 && (
           <span className="rounded-full bg-mint px-2 py-0.5 text-[10px] font-bold text-ocean">
             {result.citations.length} triad sources
@@ -925,8 +935,10 @@ function ChatComposer({ question, setQuestion, submit, loading, mode }) {
         <span>Enter to send · Shift+Enter for new line</span>
         <span>
           {mode === 'rag_verified'
-            ? '3-Layer Triad (Dense + Sparse) + NLI Entailment'
-            : 'Unverified LLM Baseline'}
+            ? 'Verified RAG: 3-Layer Triad + NLI Entailment'
+            : mode === 'ollama_baseline'
+            ? 'Local Baseline: Ollama (On-Device Zero-Shot)'
+            : 'Cloud Baseline: Gemini (Parametric Zero-Shot)'}
         </span>
       </div>
     </div>
