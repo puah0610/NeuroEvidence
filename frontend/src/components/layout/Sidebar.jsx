@@ -502,7 +502,7 @@ export default function Sidebar({
               >
                 <ShieldCheck size={15} className="mt-0.5 shrink-0 text-ocean" />
                 <div>
-                  <div className="text-xs font-bold leading-none">Verified RAG (Proposed)</div>
+                  <div className="text-xs font-bold leading-none">Cloud RAG (Gemini)</div>
                   <div className="text-[10px] opacity-75 mt-0.5">Triad retrieval & NLI checks</div>
                 </div>
               </button>
@@ -521,6 +521,20 @@ export default function Sidebar({
                 </div>
               </button>
               <button
+                onClick={() => setMode('ollama_rag')}
+                className={`flex w-full items-start gap-2 rounded-lg p-2 text-left transition ${
+                  mode === 'ollama_rag'
+                    ? 'bg-purple-50 text-purple-700 font-bold border border-purple-200'
+                    : 'text-neutral-600 hover:bg-neutral-50'
+                }`}
+              >
+                <ShieldCheck size={15} className="mt-0.5 shrink-0 text-purple-600" />
+                <div>
+                  <div className="text-xs font-bold leading-none">Local RAG (Ollama)</div>
+                  <div className="text-[10px] opacity-75 mt-0.5">On-device Triad retrieval & NLI</div>
+                </div>
+              </button>
+              <button
                 onClick={() => setMode('ollama_baseline')}
                 className={`flex w-full items-start gap-2 rounded-lg p-2 text-left transition ${
                   mode === 'ollama_baseline'
@@ -531,7 +545,7 @@ export default function Sidebar({
                 <Cpu size={15} className={`mt-0.5 shrink-0 ${mode === 'ollama_baseline' ? 'text-purple-600' : 'text-neutral-400'}`} />
                 <div>
                   <div className="text-xs font-semibold leading-none">Local Baseline (Ollama)</div>
-                  <div className="text-[10px] opacity-75 mt-0.5">On-device zero-shot (Offline)</div>
+                  <div className="text-[10px] opacity-75 mt-0.5">On-device zero-shot (No RAG)</div>
                 </div>
               </button>
             </div>

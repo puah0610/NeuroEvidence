@@ -9,6 +9,7 @@ class ChatMode(str, Enum):
     baseline = "baseline"
     rag_verified = "rag_verified"
     ollama_baseline = "ollama_baseline"
+    ollama_rag = "ollama_rag"
 
 
 class Intent(str, Enum):

@@ -345,39 +345,49 @@ def evaluate_dataset(
             },
         }
 
-    # Compute paired comparisons for overlapping questions between baseline and rag_verified
+    # Compute paired comparisons for overlapping questions
     paired_comparison: dict[str, Any] = {}
-    if "baseline" in results_by_mode and "rag_verified" in results_by_mode:
-        base_by_qid = {r["question_id"]: r for r in judged_results if r.get("mode") == "baseline"}
-        rag_by_qid = {r["question_id"]: r for r in judged_results if r.get("mode") == "rag_verified"}
-        common_qids = sorted(list(set(base_by_qid.keys()) & set(rag_by_qid.keys())))
 
-        if common_qids:
-            # Paired Correctness Difference (RAG - Baseline)
-            rag_corr = [float(rag_by_qid[q]["correctness_0_2"]) for q in common_qids]
-            base_corr = [float(base_by_qid[q]["correctness_0_2"]) for q in common_qids]
-            diff_corr, c_low, c_high, p_corr = bootstrap_paired_diff(rag_corr, base_corr, np.mean, n_resamples, ci)
+    def _compute_pair(m_base: str, m_rag: str) -> dict[str, Any] | None:
+        if m_base in results_by_mode and m_rag in results_by_mode:
+            base_by_qid = {r["question_id"]: r for r in judged_results if r.get("mode") == m_base}
+            rag_by_qid = {r["question_id"]: r for r in judged_results if r.get("mode") == m_rag}
+            common_qids = sorted(list(set(base_by_qid.keys()) & set(rag_by_qid.keys())))
 
-            # Paired Unsupported Difference (RAG - Baseline, negative is improvement)
-            rag_unsup = [1.0 if int(rag_by_qid[q].get("unsupported_claims", 0)) > 0 else 0.0 for q in common_qids]
-            base_unsup = [1.0 if int(base_by_qid[q].get("unsupported_claims", 0)) > 0 else 0.0 for q in common_qids]
-            diff_unsup, u_low, u_high, p_unsup = bootstrap_paired_diff(rag_unsup, base_unsup, np.mean, n_resamples, ci)
+            if common_qids:
+                rag_corr = [float(rag_by_qid[q]["correctness_0_2"]) for q in common_qids]
+                base_corr = [float(base_by_qid[q]["correctness_0_2"]) for q in common_qids]
+                diff_corr, c_low, c_high, p_corr = bootstrap_paired_diff(rag_corr, base_corr, np.mean, n_resamples, ci)
 
-            paired_comparison = {
-                "paired_questions_count": len(common_qids),
-                "correctness_diff": {
-                    "delta": round(diff_corr, 3),
-                    "ci_95": [round(c_low, 3), round(c_high, 3)],
-                    "p_value": round(p_corr, 4),
-                    "significant_p05": p_corr < 0.05,
-                },
-                "unsupported_rate_diff": {
-                    "delta": round(diff_unsup, 3),
-                    "ci_95": [round(u_low, 3), round(u_high, 3)],
-                    "p_value": round(p_unsup, 4),
-                    "significant_p05": p_unsup < 0.05,
-                },
-            }
+                rag_unsup = [1.0 if int(rag_by_qid[q].get("unsupported_claims", 0)) > 0 else 0.0 for q in common_qids]
+                base_unsup = [1.0 if int(base_by_qid[q].get("unsupported_claims", 0)) > 0 else 0.0 for q in common_qids]
+                diff_unsup, u_low, u_high, p_unsup = bootstrap_paired_diff(rag_unsup, base_unsup, np.mean, n_resamples, ci)
+
+                return {
+                    "paired_questions_count": len(common_qids),
+                    "correctness_diff": {
+                        "delta": round(diff_corr, 3),
+                        "ci_95": [round(c_low, 3), round(c_high, 3)],
+                        "p_value": round(p_corr, 4),
+                        "significant_p05": p_corr < 0.05,
+                    },
+                    "unsupported_rate_diff": {
+                        "delta": round(diff_unsup, 3),
+                        "ci_95": [round(u_low, 3), round(u_high, 3)],
+                        "p_value": round(p_unsup, 4),
+                        "significant_p05": p_unsup < 0.05,
+                    },
+                }
+        return None
+
+    gemini_pair = _compute_pair("baseline", "rag_verified")
+    if gemini_pair:
+        paired_comparison["gemini"] = gemini_pair
+        paired_comparison.update(gemini_pair)
+
+    ollama_pair = _compute_pair("ollama_baseline", "ollama_rag")
+    if ollama_pair:
+        paired_comparison["ollama"] = ollama_pair
 
     return {
         "modes": results_by_mode,
@@ -388,10 +398,10 @@ def evaluate_dataset(
 
 
 def format_dissertation_table(metrics: dict[str, Any]) -> str:
-    """Format full academic evaluation table with 95% CIs and paired comparisons for dissertation."""
+    """Format academic evaluation table with 95% CIs and comparisons for dissertation.
+    Automatically generates a 4-way comparative table if local Ollama runs are present."""
     modes = metrics.get("modes", {})
-    base = modes.get("baseline", {})
-    rag = modes.get("rag_verified", {})
+    has_ollama = "ollama_baseline" in modes or "ollama_rag" in modes
     paired = metrics.get("paired_comparison", {})
 
     def _fmt(val_dict: dict[str, Any] | None, key: str = "mean", scale: float = 1.0, is_pct: bool = False) -> str:
@@ -404,6 +414,29 @@ def format_dissertation_table(metrics: dict[str, Any]) -> str:
         p_str = f"{point * scale:.1%}" if is_pct else f"{point * scale:.2f}"
         ci_str = f"[{ci_vals[0] * scale:.2f}, {ci_vals[1] * scale:.2f}]"
         return f"{p_str} {ci_str}"
+
+    if has_ollama:
+        o_base = modes.get("ollama_baseline", {})
+        o_rag = modes.get("ollama_rag", {})
+        g_base = modes.get("baseline", {})
+        g_rag = modes.get("rag_verified", {})
+
+        lines = [
+            "| Evaluation Metric | Local Baseline (Ollama) | Local RAG (Ollama) | Cloud Baseline (Gemini) | Cloud RAG (Gemini) |",
+            "| :--- | :---: | :---: | :---: | :---: |",
+            f"| **Sample Size (N)** | N = {o_base.get('total_questions', 'N/A')} | N = {o_rag.get('total_questions', 'N/A')} | N = {g_base.get('total_questions', 'N/A')} | N = {g_rag.get('total_questions', 'N/A')} |",
+            f"| **Mean Correctness (0-2 scale)** | {_fmt(o_base.get('correctness_0_2'))} | {_fmt(o_rag.get('correctness_0_2'))} | {_fmt(g_base.get('correctness_0_2'))} | {_fmt(g_rag.get('correctness_0_2'))} |",
+            f"| **Unsupported Claim Rate (Hallucinations)** | {_fmt(o_base.get('unsupported_claim_rate'), 'rate', 100.0)}% | {_fmt(o_rag.get('unsupported_claim_rate'), 'rate', 100.0)}% | {_fmt(g_base.get('unsupported_claim_rate'), 'rate', 100.0)}% | {_fmt(g_rag.get('unsupported_claim_rate'), 'rate', 100.0)}% |",
+            f"| **Citation Precision (0-1 scale)** | {_fmt(o_base.get('citation_precision'))} | {_fmt(o_rag.get('citation_precision'))} | {_fmt(g_base.get('citation_precision'))} | {_fmt(g_rag.get('citation_precision'))} |",
+            f"| **Abstention Precision** | {o_base.get('abstention', {}).get('abstention_precision', 'N/A')} | {o_rag.get('abstention', {}).get('abstention_precision', 'N/A')} | {g_base.get('abstention', {}).get('abstention_precision', 'N/A')} | {g_rag.get('abstention', {}).get('abstention_precision', 'N/A')} |",
+            f"| **Abstention Recall** | {o_base.get('abstention', {}).get('abstention_recall', 'N/A')} | {o_rag.get('abstention', {}).get('abstention_recall', 'N/A')} | {g_base.get('abstention', {}).get('abstention_recall', 'N/A')} | {g_rag.get('abstention', {}).get('abstention_recall', 'N/A')} |",
+            f"| **Mean Latency (ms)** | {o_base.get('system_performance', {}).get('mean_latency_ms', 'N/A')} ms | {o_rag.get('system_performance', {}).get('mean_latency_ms', 'N/A')} ms | {g_base.get('system_performance', {}).get('mean_latency_ms', 'N/A')} ms | {g_rag.get('system_performance', {}).get('mean_latency_ms', 'N/A')} ms |",
+            f"| **Estimated Cost ($ / query)** | $0.00 | $0.00 | ${g_base.get('system_performance', {}).get('mean_cost_usd', 0.0):.4f} | ${g_rag.get('system_performance', {}).get('mean_cost_usd', 0.0):.4f} |",
+        ]
+        return "\n".join(lines)
+
+    base = modes.get("baseline", {})
+    rag = modes.get("rag_verified", {})
 
     lines = [
         "| Evaluation Metric | Baseline (Plain LLM) [95% CI] | NeuroEvidence (RAG Verified) [95% CI] | Paired Difference [95% CI] | p-value |",

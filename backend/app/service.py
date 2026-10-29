@@ -393,6 +393,8 @@ class ChatService:
             if temporal_unanswered not in unanswered_parts:
                 unanswered_parts.append(temporal_unanswered)
 
+        active_generator = self.ollama_adapter if request.mode.value == "ollama_rag" else self.generator
+
         if not chunks:
             if lf_client:
                 try:
@@ -400,7 +402,7 @@ class ChatService:
                         metadata={
                             "question_id": request.question_id,
                             "pipeline_version": getattr(self.settings, "pipeline_version", "triad-rag-v2.1"),
-                            "model": self.generator.model_name,
+                            "model": active_generator.model_name,
                             "decision": "abstained",
                             "nli_action": "abstained_no_evidence",
                             "retrieved_source_ids": [],
@@ -425,14 +427,15 @@ class ChatService:
                 live_pubmed_triggered=live_pubmed_triggered,
                 live_pubmed_query=live_pubmed_query,
                 latency_ms=_elapsed_ms(started),
-                model=self.generator.model_name,
+                model=active_generator.model_name,
                 demo_mode=self.settings.demo_mode,
                 created_at=datetime.now(UTC),
             )
             self.database.save_trace(request.session_id, request.question, result)
             return result
 
-        generation = self.generator.generate_grounded(
+        active_generator = self.ollama_adapter if request.mode.value == "ollama_rag" else self.generator
+        generation = active_generator.generate_grounded(
             request.question,
             chunks,
             ddi_report=ddi_report,
@@ -498,7 +501,7 @@ class ChatService:
 
         if needs_revision:
             # Step 4: Revise unsupported claims and inline citations
-            revision_generation = self.generator.revise_grounded(
+            revision_generation = active_generator.revise_grounded(
                 request.question,
                 original_answer,
                 verification.claims,
@@ -636,10 +639,10 @@ class ChatService:
             live_pubmed_triggered=live_pubmed_triggered,
             live_pubmed_query=live_pubmed_query,
             latency_ms=_elapsed_ms(started),
-            model=self.generator.model_name,
+            model=active_generator.model_name,
             input_tokens=total_input_tokens,
             output_tokens=total_output_tokens,
-            estimated_cost_usd=self._cost(total_input_tokens, total_output_tokens),
+            estimated_cost_usd=0.0 if (request.mode.value == "ollama_rag" or active_generator is self.ollama_adapter) else self._cost(total_input_tokens, total_output_tokens),
             demo_mode=self.settings.demo_mode,
             created_at=datetime.now(UTC),
         )

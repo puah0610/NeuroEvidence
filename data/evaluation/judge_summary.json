@@ -1,18 +1,46 @@
 {
   "baseline": {
-    "total_questions": 8,
+    "total_questions": 11,
     "mean_correctness_0_2": 2.0,
     "unsupported_claim_rate": 0.0,
     "avg_unsupported_claims_per_answer": 0.0,
     "mean_citation_precision": "N/A",
-    "abstention_accuracy": 1.0
+    "abstention_accuracy": 1.0,
+    "abstention_precision": 1.0,
+    "abstention_recall": 1.0,
+    "abstention_f1": 1.0
+  },
+  "ollama_baseline": {
+    "total_questions": 11,
+    "mean_correctness_0_2": 1.909,
+    "unsupported_claim_rate": 0.091,
+    "avg_unsupported_claims_per_answer": 0.091,
+    "mean_citation_precision": "N/A",
+    "abstention_accuracy": 0.8,
+    "abstention_precision": 1.0,
+    "abstention_recall": 0.8,
+    "abstention_f1": 0.8889
+  },
+  "ollama_rag": {
+    "total_questions": 11,
+    "mean_correctness_0_2": 0.818,
+    "unsupported_claim_rate": 0.182,
+    "avg_unsupported_claims_per_answer": 0.909,
+    "mean_citation_precision": "N/A",
+    "abstention_accuracy": 0.8,
+    "abstention_precision": 0.4,
+    "abstention_recall": 0.8,
+    "abstention_f1": 0.5333
   },
   "rag_verified": {
-    "total_questions": 10,
-    "mean_correctness_0_2": 2.0,
-    "unsupported_claim_rate": 0.0,
-    "avg_unsupported_claims_per_answer": 0.0,
-    "mean_citation_precision": 0.91,
-    "abstention_accuracy": 1.0
+    "total_questions": 11,
+    "mean_correctness_0_2": 1.818,
+    "unsupported_claim_rate": 0.091,
+    "avg_unsupported_claims_per_answer": 0.455,
+    "mean_citation_precision": 0.889,
+    "abstention_accuracy": 0.8,
+    "abstention_precision": 1.0,
+    "abstention_recall": 0.8,
+    "abstention_f1": 0.8889
   }
 }

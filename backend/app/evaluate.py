@@ -27,6 +27,7 @@ def run(
     blind_path: Path,
     api_url: str,
     split: str,
+    modes: list[str] | None = None,
 ) -> None:
     questions_path = _resolve_project_path(questions_path)
     output_path = _resolve_project_path(output_path)
@@ -37,12 +38,34 @@ def run(
     if not questions:
         raise ValueError(f"No questions found for split={split}")
 
+    active_modes = modes or ["baseline", "rag_verified"]
     output_path.parent.mkdir(parents=True, exist_ok=True)
     results: list[dict] = []
-    with httpx.Client(base_url=api_url, timeout=120) as client:
+    completed_keys: set[tuple[str, str]] = set()
+
+    # Resume from existing runs if output_path exists
+    if output_path.exists():
+        try:
+            with output_path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    if line.strip():
+                        item = json.loads(line)
+                        key = (item.get("question_id"), item.get("mode"))
+                        completed_keys.add(key)
+                        results.append(item)
+            if completed_keys:
+                print(f"Resuming evaluation: found {len(completed_keys)} previously completed results.", flush=True)
+        except Exception:
+            pass
+
+    with httpx.Client(base_url=api_url, timeout=300.0) as client:
         for row in questions:
-            modes = ["baseline", "rag_verified"] if row["category"] in COMPARISON_CATEGORIES else ["rag_verified"]
-            for mode in modes:
+            for mode in active_modes:
+                key = (row["question_id"], mode)
+                if key in completed_keys:
+                    print(f"{row['question_id']} {mode} (already completed)", flush=True)
+                    continue
+
                 response = client.post(
                     "/api/chat",
                     json={
@@ -54,33 +77,34 @@ def run(
                 )
                 response.raise_for_status()
                 payload = response.json()
-                results.append(
-                    {
-                        "question_id": row["question_id"],
-                        "split": split,
-                        "category": row["category"],
-                        "topic": row["topic"],
-                        "question": row["question"],
-                        "mode": mode,
-                        "trace_id": payload["trace_id"],
-                        "answer": payload["answer"],
-                        "citations": payload["citations"],
-                        "claim_checks": payload["claim_checks"],
-                        "evidence_score": payload["evidence_score"],
-                        "warnings": payload["warnings"],
-                        "latency_ms": payload["latency_ms"],
-                        "model": payload["model"],
-                        "input_tokens": payload["input_tokens"],
-                        "output_tokens": payload["output_tokens"],
-                        "estimated_cost_usd": payload["estimated_cost_usd"],
-                    }
-                )
+                record = {
+                    "question_id": row["question_id"],
+                    "split": split,
+                    "category": row["category"],
+                    "topic": row["topic"],
+                    "question": row["question"],
+                    "mode": mode,
+                    "trace_id": payload["trace_id"],
+                    "answer": payload["answer"],
+                    "citations": payload["citations"],
+                    "claim_checks": payload["claim_checks"],
+                    "evidence_score": payload["evidence_score"],
+                    "warnings": payload["warnings"],
+                    "latency_ms": payload["latency_ms"],
+                    "model": payload["model"],
+                    "input_tokens": payload["input_tokens"],
+                    "output_tokens": payload["output_tokens"],
+                    "estimated_cost_usd": payload["estimated_cost_usd"],
+                }
+                results.append(record)
+                completed_keys.add(key)
+
+                # Persist incrementally so progress is never lost if interrupted
+                with output_path.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+
                 print(f"{row['question_id']} {mode}", flush=True)
 
-    output_path.write_text(
-        "\n".join(json.dumps(item, ensure_ascii=False) for item in results),
-        encoding="utf-8",
-    )
     write_blinded(results, blind_path)
 
 
@@ -121,8 +145,17 @@ def main() -> None:
     parser.add_argument("--judge-output", type=Path, default=Path("data/evaluation/judge_review.csv"), help="Path to judge CSV output")
     parser.add_argument("--judge-summary", type=Path, default=Path("data/evaluation/judge_summary.json"), help="Path to judge summary JSON")
     parser.add_argument("--judge-model", type=str, default=None, help="LLM model to use for the judge (e.g. gemini-2.5-pro)")
+    parser.add_argument("--all-modes", action="store_true", help="Evaluate all 4 configurations: baseline, rag_verified, ollama_baseline, ollama_rag")
+    parser.add_argument("--modes", type=str, default=None, help="Comma-separated list of modes (e.g. baseline,rag_verified,ollama_baseline,ollama_rag)")
     args = parser.parse_args()
-    run(args.questions, args.output, args.blind_output, args.api_url, args.split)
+
+    selected_modes = None
+    if args.all_modes:
+        selected_modes = ["baseline", "rag_verified", "ollama_baseline", "ollama_rag"]
+    elif args.modes:
+        selected_modes = [m.strip() for m in args.modes.split(",") if m.strip()]
+
+    run(args.questions, args.output, args.blind_output, args.api_url, args.split, modes=selected_modes)
 
     if args.run_judge:
         from .evaluate_judge import format_comparison_table, run_judge

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
     gemini_generation_model: str = "models/gemini-3.1-flash-lite"
-    gemini_judge_model: str = "gemini-2.5-pro"
+    gemini_judge_model: str = "models/gemini-3.1-flash-lite"
     gemini_embedding_model: str = "gemini-embedding-001"
     gemini_input_cost_per_million: float = Field(default=0.0, ge=0)
     gemini_output_cost_per_million: float = Field(default=0.0, ge=0)
@@ -105,27 +105,37 @@ class Settings(BaseSettings):
 
     @property
     def smart_demo_enabled(self) -> bool:
-        """True when demo_mode=True but an API key is present.
-        Enables real LLM answer generation (Gemini/OpenAI) while keeping
+        """True when demo_mode=True but an API key or local model is present.
+        Enables real LLM answer generation while keeping
         the lightweight DemoRetriever — no ChromaDB required."""
         if not self.demo_mode:
             return False
         if self.llm_provider.lower() == "gemini":
             return bool(self.gemini_api_key)
+        if self.llm_provider.lower() == "ollama":
+            return True
         return bool(self.openai_api_key)
 
     @property
     def active_llm_enabled(self) -> bool:
-        return self.gemini_enabled if self.llm_provider.lower() == "gemini" else self.openai_enabled
+        if self.llm_provider.lower() == "gemini":
+            return self.gemini_enabled
+        if self.llm_provider.lower() == "ollama":
+            return True
+        return self.openai_enabled
 
     @property
     def active_input_cost_per_million(self) -> float:
+        if self.llm_provider.lower() == "ollama":
+            return 0.0
         if self.llm_provider.lower() == "gemini":
             return self.gemini_input_cost_per_million
         return self.generation_input_cost_per_million
 
     @property
     def active_output_cost_per_million(self) -> float:
+        if self.llm_provider.lower() == "ollama":
+            return 0.0
         if self.llm_provider.lower() == "gemini":
             return self.gemini_output_cost_per_million
         return self.generation_output_cost_per_million

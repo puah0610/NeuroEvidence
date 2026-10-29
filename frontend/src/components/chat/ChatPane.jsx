@@ -229,6 +229,11 @@ function AssistantMessageCard({ result }) {
             Local Baseline (Ollama)
           </span>
         )}
+        {result.mode === 'ollama_rag' && (
+          <span className="rounded-full bg-purple-100 border border-purple-300 px-2 py-0.5 text-[10px] font-bold text-purple-900">
+            Local RAG (Ollama Verified)
+          </span>
+        )}
         {result.citations?.length > 0 && (
           <span className="rounded-full bg-mint px-2 py-0.5 text-[10px] font-bold text-ocean">
             {result.citations.length} triad sources
@@ -277,7 +282,7 @@ function AssistantMessageCard({ result }) {
         </div>
 
         {/* Verification & Claim Entailment Panel */}
-        {result.mode === 'rag_verified' && (
+        {(result.mode === 'rag_verified' || result.mode === 'ollama_rag') && (
           <VerificationSection
             result={result}
             isOpen={inspectionOpen}
@@ -935,7 +940,9 @@ function ChatComposer({ question, setQuestion, submit, loading, mode }) {
         <span>Enter to send · Shift+Enter for new line</span>
         <span>
           {mode === 'rag_verified'
-            ? 'Verified RAG: 3-Layer Triad + NLI Entailment'
+            ? 'Cloud RAG: Gemini + Triad + NLI Entailment'
+            : mode === 'ollama_rag'
+            ? 'Local RAG: Ollama + Triad + NLI Entailment'
             : mode === 'ollama_baseline'
             ? 'Local Baseline: Ollama (On-Device Zero-Shot)'
             : 'Cloud Baseline: Gemini (Parametric Zero-Shot)'}

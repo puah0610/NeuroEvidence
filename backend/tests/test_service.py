@@ -80,3 +80,20 @@ async def test_ollama_baseline_operates_without_retrieval(service, database) -> 
         assert len(response.original_answer) > 0
     assert database.summary().total_traces >= 1
 
+
+@pytest.mark.asyncio
+async def test_ollama_rag_operates_with_retrieval_and_citations(service, database) -> None:
+    response = await service.chat(
+        ChatRequest(
+            session_id="test-ollama-rag-session",
+            question="What are the key movement features of Parkinson's disease?",
+            mode=ChatMode.ollama_rag,
+        )
+    )
+    assert response.mode == ChatMode.ollama_rag
+    assert response.citations
+    assert response.claim_checks
+    assert response.evidence_score is not None
+    assert response.estimated_cost_usd == 0.0
+
+

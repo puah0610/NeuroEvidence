@@ -212,44 +212,80 @@ def compute_metrics(judged_results: list[dict[str, Any]]) -> dict[str, Any]:
 
 def format_comparison_table(metrics: dict[str, Any]) -> str:
     """Format evaluation comparison table in markdown for thesis reporting."""
+    modes = list(metrics.keys())
+    if not modes:
+        return "No evaluation metrics available."
+
+    if set(modes).issubset({"baseline", "rag_verified"}):
+        lines = [
+            "| Metric | Baseline (Plain LLM) | NeuroEvidence (RAG Verified) | Improvement / Difference |",
+            "| :--- | :---: | :---: | :---: |",
+        ]
+        base = metrics.get("baseline", {})
+        rag = metrics.get("rag_verified", {})
+
+        # Correctness
+        b_corr = base.get("mean_correctness_0_2", "N/A")
+        r_corr = rag.get("mean_correctness_0_2", "N/A")
+        diff_corr = f"+{r_corr - b_corr:.2f}" if isinstance(b_corr, (int, float)) and isinstance(r_corr, (int, float)) else "N/A"
+        lines.append(f"| **Mean Correctness (0-2)** | {b_corr} | {r_corr} | {diff_corr} |")
+
+        # Unsupported claim rate (Hallucination)
+        b_unsup = base.get("unsupported_claim_rate", "N/A")
+        r_unsup = rag.get("unsupported_claim_rate", "N/A")
+        diff_unsup = f"{(r_unsup - b_unsup) * 100:+.1f}%" if isinstance(b_unsup, (int, float)) and isinstance(r_unsup, (int, float)) else "N/A"
+        lines.append(f"| **Unsupported Claim Rate (Hallucinations)** | {b_unsup} | {r_unsup} | {diff_unsup} |")
+
+        # Citation Precision
+        b_cit = base.get("mean_citation_precision", "N/A")
+        r_cit = rag.get("mean_citation_precision", "N/A")
+        lines.append(f"| **Citation Precision (0-1)** | {b_cit} | {r_cit} | Grounded to Excerpts |")
+
+        # Abstention Accuracy
+        b_abs = base.get("abstention_accuracy", "N/A")
+        r_abs = rag.get("abstention_accuracy", "N/A")
+        lines.append(f"| **Abstention Accuracy (Safety/OOS)** | {b_abs} | {r_abs} | Guardrail Enforced |")
+
+        # Formal Abstention Precision and Recall
+        b_prec = base.get("abstention_precision", "N/A")
+        r_prec = rag.get("abstention_precision", "N/A")
+        lines.append(f"| **Abstention Precision** | {b_prec} | {r_prec} | Refusal Precision |")
+
+        b_rec = base.get("abstention_recall", "N/A")
+        r_rec = rag.get("abstention_recall", "N/A")
+        lines.append(f"| **Abstention Recall** | {b_rec} | {r_rec} | Refusal Coverage |")
+
+        return "\n".join(lines)
+
+    mode_headers = {
+        "baseline": "Gemini Baseline",
+        "rag_verified": "Gemini + Triad RAG",
+        "ollama_baseline": "Ollama Baseline",
+        "ollama_rag": "Ollama + Triad RAG",
+    }
+    headers = ["Metric"] + [mode_headers.get(m, m) for m in modes]
     lines = [
-        "| Metric | Baseline (Plain LLM) | NeuroEvidence (RAG Verified) | Improvement / Difference |",
-        "| :--- | :---: | :---: | :---: |",
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join([":---"] + [":---:"] * len(modes)) + " |",
     ]
 
-    base = metrics.get("baseline", {})
-    rag = metrics.get("rag_verified", {})
+    metric_defs = [
+        ("Mean Correctness (0-2)", "mean_correctness_0_2", lambda v: f"{v:.2f}" if isinstance(v, (int, float)) else str(v)),
+        ("Unsupported Claim Rate", "unsupported_claim_rate", lambda v: f"{v*100:.1f}%" if isinstance(v, (int, float)) else str(v)),
+        ("Avg Unsupported Claims", "avg_unsupported_claims_per_answer", lambda v: f"{v:.2f}" if isinstance(v, (int, float)) else str(v)),
+        ("Mean Citation Precision", "mean_citation_precision", lambda v: f"{v:.2f}" if isinstance(v, (int, float)) else str(v)),
+        ("Abstention Accuracy", "abstention_accuracy", lambda v: f"{v*100:.1f}%" if isinstance(v, (int, float)) else str(v)),
+        ("Abstention Precision", "abstention_precision", lambda v: f"{v*100:.1f}%" if isinstance(v, (int, float)) else str(v)),
+        ("Abstention Recall", "abstention_recall", lambda v: f"{v*100:.1f}%" if isinstance(v, (int, float)) else str(v)),
+        ("Abstention F1", "abstention_f1", lambda v: f"{v:.2f}" if isinstance(v, (int, float)) else str(v)),
+    ]
 
-    # Correctness
-    b_corr = base.get("mean_correctness_0_2", "N/A")
-    r_corr = rag.get("mean_correctness_0_2", "N/A")
-    diff_corr = f"+{r_corr - b_corr:.2f}" if isinstance(b_corr, (int, float)) and isinstance(r_corr, (int, float)) else "N/A"
-    lines.append(f"| **Mean Correctness (0-2)** | {b_corr} | {r_corr} | {diff_corr} |")
-
-    # Unsupported claim rate (Hallucination)
-    b_unsup = base.get("unsupported_claim_rate", "N/A")
-    r_unsup = rag.get("unsupported_claim_rate", "N/A")
-    diff_unsup = f"{(r_unsup - b_unsup) * 100:+.1f}%" if isinstance(b_unsup, (int, float)) and isinstance(r_unsup, (int, float)) else "N/A"
-    lines.append(f"| **Unsupported Claim Rate (Hallucinations)** | {b_unsup} | {r_unsup} | {diff_unsup} |")
-
-    # Citation Precision
-    b_cit = base.get("mean_citation_precision", "N/A")
-    r_cit = rag.get("mean_citation_precision", "N/A")
-    lines.append(f"| **Citation Precision (0-1)** | {b_cit} | {r_cit} | Grounded to Excerpts |")
-
-    # Abstention Accuracy
-    b_abs = base.get("abstention_accuracy", "N/A")
-    r_abs = rag.get("abstention_accuracy", "N/A")
-    lines.append(f"| **Abstention Accuracy (Safety/OOS)** | {b_abs} | {r_abs} | Guardrail Enforced |")
-
-    # Formal Abstention Precision and Recall
-    b_prec = base.get("abstention_precision", "N/A")
-    r_prec = rag.get("abstention_precision", "N/A")
-    lines.append(f"| **Abstention Precision** | {b_prec} | {r_prec} | Refusal Precision |")
-
-    b_rec = base.get("abstention_recall", "N/A")
-    r_rec = rag.get("abstention_recall", "N/A")
-    lines.append(f"| **Abstention Recall** | {b_rec} | {r_rec} | Refusal Coverage |")
+    for label, key, fmt in metric_defs:
+        row = [f"**{label}**"]
+        for m in modes:
+            val = metrics[m].get(key, "N/A")
+            row.append(fmt(val) if val not in ("N/A", None) else "N/A")
+        lines.append("| " + " | ".join(row) + " |")
 
     return "\n".join(lines)
 
@@ -270,7 +306,7 @@ def run_judge(
     settings: Settings | None = None,
     judge_model: str | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Run full judge pipeline over trace JSONL file."""
+    """Run full judge pipeline over trace JSONL file with incremental saving and auto-resume."""
     traces_path = _resolve_project_path(traces_path)
     output_csv_path = _resolve_project_path(output_csv_path)
     if summary_path:
@@ -295,13 +331,64 @@ def run_judge(
     with traces_path.open("r", encoding="utf-8") as handle:
         items = [json.loads(line) for line in handle if line.strip()]
 
+    output_csv_path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "question_id",
+        "mode",
+        "category",
+        "topic",
+        "reviewer",
+        "correctness_0_2",
+        "unsupported_claims",
+        "citation_precision_0_1",
+        "appropriate_abstention_0_1",
+        "notes",
+        "question",
+        "answer",
+    ]
+
+    existing_judged: dict[tuple[str, str], dict[str, Any]] = {}
+    if output_csv_path.exists():
+        try:
+            with output_csv_path.open("r", encoding="utf-8-sig") as handle:
+                reader = csv.DictReader(handle)
+                for row in reader:
+                    qid = row.get("question_id", "")
+                    mod = row.get("mode", "")
+                    if qid and mod:
+                        parsed = dict(row)
+                        for num_f in ["correctness_0_2", "unsupported_claims", "appropriate_abstention_0_1"]:
+                            if num_f in parsed and parsed[num_f] not in ("", None):
+                                parsed[num_f] = int(parsed[num_f])
+                        if "citation_precision_0_1" in parsed:
+                            val = parsed["citation_precision_0_1"]
+                            parsed["citation_precision_0_1"] = float(val) if val not in ("", None, "None", "null") else None
+                        existing_judged[(qid, mod)] = parsed
+        except Exception as e:
+            logger.warning("Could not read existing judge CSV for resume: %s", e)
+
+    if not output_csv_path.exists() or not existing_judged:
+        with output_csv_path.open("w", encoding="utf-8-sig", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+
     logger.info("Starting LLM-as-a-Judge using %s for %d responses...", target_model, len(items))
     judged: list[dict[str, Any]] = []
 
     for index, item in enumerate(items, start=1):
+        key = (item.get("question_id", ""), item.get("mode", ""))
+        if key in existing_judged:
+            print(f"Judging {index}/{len(items)}: {key[0]} ({key[1]}) [Already judged - skipping]", flush=True)
+            judged.append(existing_judged[key])
+            continue
+
         print(f"Judging {index}/{len(items)}: {item.get('question_id')} ({item.get('mode')})...", flush=True)
         res = judge_single_item(adapter, item)
         judged.append(res)
+
+        with output_csv_path.open("a", encoding="utf-8-sig", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writerow(res)
 
         if lf_client and item.get("trace_id"):
             try:
@@ -334,25 +421,12 @@ def run_judge(
             except Exception as e:
                 logger.debug("Failed to push judge scores to Langfuse for trace %s: %s", item.get("trace_id"), e)
 
-    output_csv_path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames = [
-        "question_id",
-        "mode",
-        "category",
-        "topic",
-        "reviewer",
-        "correctness_0_2",
-        "unsupported_claims",
-        "citation_precision_0_1",
-        "appropriate_abstention_0_1",
-        "notes",
-        "question",
-        "answer",
-    ]
-    with output_csv_path.open("w", encoding="utf-8-sig", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(judged)
+    metrics = compute_metrics(judged)
+    if summary_path:
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+
+    return judged, metrics
 
     metrics = compute_metrics(judged)
     if summary_path:
