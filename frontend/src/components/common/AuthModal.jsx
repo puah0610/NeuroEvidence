@@ -46,17 +46,17 @@ export default function AuthModal({ isOpen, onClose, onLogin, userProfile }) {
                 </div>
                 <div>
                   <div className="text-xs font-bold text-ink">{userProfile?.name || 'Dr. Daniel'}</div>
-                  <div className="text-[11px] text-neutral-500">{userProfile?.role || 'Clinical Neurologist'}</div>
-                  <div className="text-[10px] text-neutral-400 mt-0.5">{userProfile?.specialty || 'Movement Disorders & Epilepsy'}</div>
+                  <div className="text-[11px] text-neutral-600 font-medium">{userProfile?.role || 'Medical Student / Researcher'}</div>
+                  <div className="text-[10px] text-neutral-400 mt-0.5">{userProfile?.specialty || 'Neurology & Neurotherapeutics'}</div>
                 </div>
               </div>
               <CheckCircle2 size={18} className="text-ocean" />
             </div>
           </div>
 
-          <div className="rounded-xl border border-neutral-200/80 bg-neutral-50/50 p-3 text-[11px] text-neutral-500 flex items-start gap-2">
-            <ShieldAlert size={14} className="shrink-0 text-neutral-400 mt-0.5" />
-            <span>All inquiries are evaluated using 3-Layer Triad evidence with claim-level NLI verification.</span>
+          <div className="rounded-xl border border-amber-200/80 bg-amber-50/70 p-3 text-[11px] text-amber-900 flex items-start gap-2">
+            <ShieldAlert size={14} className="shrink-0 text-amber-600 mt-0.5" />
+            <span><strong>Educational & Research Use Only:</strong> Grounded in peer-reviewed guidelines and RCTs to assist medical learners. Not for clinical prescribing.</span>
           </div>
 
           <button
@@ -65,7 +65,7 @@ export default function AuthModal({ isOpen, onClose, onLogin, userProfile }) {
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-ocean transition disabled:opacity-50"
           >
             <LogIn size={15} />
-            <span>{loggingIn ? 'Authenticating...' : `Sign In as ${userProfile?.name || 'Dr. Daniel'}`}</span>
+            <span>{loggingIn ? 'Authenticating...' : `Sign In as ${userProfile?.name || 'Daniel Puah'}`}</span>
           </button>
         </form>
       </div>

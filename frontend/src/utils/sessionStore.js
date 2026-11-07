@@ -85,11 +85,11 @@ export function formatSessionTimestamp(timestamp) {
 const STORAGE_USER_KEY = 'neuroevidence_user_v1'
 
 export const DEFAULT_USER = {
-  name: 'Dr. Daniel',
-  role: 'Clinical Neurologist',
-  email: 'daniel.puah@clinical.org',
-  specialty: 'Movement Disorders & Epilepsy',
-  institution: 'Movement Disorders & Neurotherapeutics Center',
+  name: 'Daniel Puah',
+  role: 'Medical Student / Researcher',
+  email: 'daniel.puah@university.edu',
+  specialty: 'Neurology & Neurotherapeutics',
+  institution: 'School of Medicine / University Health',
 }
 
 const STORAGE_SETTINGS_KEY = 'neuroevidence_settings_v1'

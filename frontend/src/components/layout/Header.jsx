@@ -195,14 +195,11 @@ export default function Header({
 
         {/* Right controls */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Triad KB overview modal trigger */}
-          <button
-            onClick={onOpenTriad}
-            className="hidden items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-neutral-700 shadow-2xs transition hover:border-neutral-300 hover:bg-neutral-50 sm:inline-flex"
-          >
-            <Layers size={14} className="text-ocean" />
-            <span>3-Layer Triad KB</span>
-          </button>
+          {/* Educational Use Disclaimer Banner */}
+          <div className="hidden md:flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/90 px-3 py-1 text-[11px] font-medium text-amber-900 shadow-2xs">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+            <span>Educational & Research Study Tool · Not for clinical prescribing</span>
+          </div>
 
           {/* Health indicator */}
           <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200/80 bg-neutral-50/80 px-2.5 py-1.5 text-[11px] font-medium text-neutral-600">

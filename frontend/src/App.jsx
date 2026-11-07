@@ -316,6 +316,7 @@ export default function App() {
                 mode={mode}
                 endRef={endRef}
                 onOpenTriad={() => setTriadModalOpen(true)}
+                activeFolder={folders?.find((f) => f.id === activeSession?.folderId) || folders?.[0]}
               />
             </div>
           )}

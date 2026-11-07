@@ -17,7 +17,10 @@ import {
   Info,
   Layers,
   Microscope,
+  Pill,
   ShieldCheck,
+  Sparkles,
+  Stethoscope,
   ThumbsDown,
   ThumbsUp,
   XCircle,
@@ -25,28 +28,86 @@ import {
 import { api } from '../../api'
 import { cleanLatexMath, parseAnswerBlocks } from './chatUtils'
 
-const starterQuestions = [
-  {
-    title: 'PD Causes & Guideline Evidence (Multi-Part)',
-    query: "What causes Parkinson's disease, and what evidence supports the treatments described in guidelines?",
-    tag: 'Selective Decomposition • Triad',
-  },
-  {
-    title: 'NICE NG217 Monotherapy Algorithms',
-    query: 'What does NICE NG217 recommend for first-line treatment of focal vs generalized seizures?',
-    tag: 'Epilepsy • Guidelines',
-  },
-  {
-    title: 'Sodium Valproate & Lamotrigine Synergy',
-    query: 'Can a patient on sodium valproate be safely started on lamotrigine for focal seizures?',
-    tag: 'DDI • Valproate • Safety',
-  },
-  {
-    title: 'Hoehn & Yahr Staging & Pharmacotherapy',
-    query: "How do Hoehn & Yahr staging and NICE NG71 guide levodopa vs dopamine agonists in Parkinson's?",
-    tag: 'Parkinsons • Staging',
-  },
-]
+const domainStarterQuestions = {
+  'f-pd': [
+    {
+      title: 'Motor Symptom Staging (Hoehn & Yahr)',
+      query: "How do Hoehn & Yahr staging and NICE NG71 guide the choice between levodopa and dopamine agonists in Parkinson's disease?",
+      category: 'Pharmacotherapy',
+      badge: 'NICE NG71',
+    },
+    {
+      title: 'Managing Levodopa Motor Fluctuations',
+      query: 'What does guideline evidence recommend for managing end-of-dose wearing-off and dyskinesia in advanced Parkinson’s disease?',
+      category: 'Clinical Guidelines',
+      badge: 'Motor Fluctuations',
+    },
+    {
+      title: 'MAO-B Inhibitor Monotherapy vs Early Levodopa',
+      query: 'What does Cochrane review evidence conclude about initial monotherapy with rasagiline or selegiline vs levodopa in early PD?',
+      category: 'Evidence Trials',
+      badge: 'Cochrane RCT',
+    },
+    {
+      title: 'Dopamine Agonist Impulse Control Disorders',
+      query: 'What monitoring and taper protocols are advised for dopamine agonist withdrawal syndrome and impulse control disorders in PD?',
+      category: 'Safety & Monitoring',
+      badge: 'Adverse Events',
+    },
+  ],
+  'f-epi': [
+    {
+      title: 'First-Line Seizure Monotherapy Algorithms',
+      query: 'What does NICE NG217 recommend as first-line monotherapy for newly diagnosed focal vs generalized tonic-clonic seizures?',
+      category: 'Clinical Guidelines',
+      badge: 'NICE NG217',
+    },
+    {
+      title: 'Valproate & Lamotrigine Safety & DDI',
+      query: 'Can a patient on sodium valproate be safely started on lamotrigine? What dose titration adjustments are necessary?',
+      category: 'Safety & DDI',
+      badge: 'High Alert',
+    },
+    {
+      title: 'SANAD II Trial: Levetiracetam vs Valproate',
+      query: 'What clinical evidence from the SANAD II trial compares levetiracetam vs valproate for generalized and unclassified epilepsy?',
+      category: 'Evidence Trials',
+      badge: 'SANAD II RCT',
+    },
+    {
+      title: 'Status Epilepticus In-Hospital Protocol',
+      query: 'What is the stepped pharmacotherapy escalation protocol for convulsive status epilepticus according to NICE guidelines?',
+      category: 'Emergency Protocol',
+      badge: 'Emergency Guidelines',
+    },
+  ],
+  'f-general': [
+    {
+      title: 'First-Line Seizure Monotherapy',
+      query: 'What does NICE recommend for first-line monotherapy in focal vs generalized tonic-clonic seizures?',
+      category: 'Clinical Guidelines',
+      badge: 'NICE NG217',
+    },
+    {
+      title: 'Valproate & Lamotrigine Safety & DDI',
+      query: 'Can a patient on sodium valproate be safely started on lamotrigine? What dose adjustments are needed?',
+      category: 'Safety & DDI',
+      badge: 'High Alert',
+    },
+    {
+      title: 'Parkinson’s Motor Symptom Staging',
+      query: "How do Hoehn & Yahr staging and NICE NG71 guide the choice between levodopa and dopamine agonists?",
+      category: 'Pharmacotherapy',
+      badge: 'NICE NG71',
+    },
+    {
+      title: 'SANAD II Trial Outcomes',
+      query: 'What clinical evidence from the SANAD II trial compares levetiracetam vs valproate/lamotrigine for efficacy?',
+      category: 'Evidence Trials',
+      badge: 'SANAD II RCT',
+    },
+  ],
+}
 
 export default function ChatPane({
   messages,
@@ -57,6 +118,7 @@ export default function ChatPane({
   mode,
   endRef,
   onOpenTriad,
+  activeFolder,
 }) {
   return (
     <div className="flex h-full flex-col bg-white">
@@ -64,7 +126,12 @@ export default function ChatPane({
       <div className="flex-1 overflow-y-auto px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl">
           {messages.length === 0 ? (
-            <WelcomeView submit={submit} mode={mode} onOpenTriad={onOpenTriad} />
+            <WelcomeView
+              submit={submit}
+              mode={mode}
+              onOpenTriad={onOpenTriad}
+              activeFolder={activeFolder}
+            />
           ) : (
             <div className="space-y-6 pb-6">
               {messages.map((message, idx) => (
@@ -86,6 +153,7 @@ export default function ChatPane({
             submit={submit}
             loading={loading}
             mode={mode}
+            activeFolder={activeFolder}
           />
         </div>
       </div>
@@ -93,69 +161,78 @@ export default function ChatPane({
   )
 }
 
-function WelcomeView({ submit, mode, onOpenTriad }) {
+function WelcomeView({ submit, mode, onOpenTriad, activeFolder }) {
+  const folderId = activeFolder?.id || 'f-general'
+  const questions = domainStarterQuestions[folderId] || domainStarterQuestions['f-general']
+  const domainLabel =
+    folderId === 'f-pd'
+      ? "Parkinson's Disease"
+      : folderId === 'f-epi'
+      ? 'Epilepsy & Seizures'
+      : 'Neurology (Parkinson’s & Epilepsy)'
+
   return (
     <div className="my-auto py-8 text-center fade-up">
-      <div className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-2xl border border-ocean/20 bg-mint text-ocean shadow-soft">
-        <Microscope size={28} strokeWidth={1.7} />
+      {/* Sleek Medical Brand Badge */}
+      <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border border-ocean/20 bg-mint/50 px-3.5 py-1 text-xs font-semibold text-ocean shadow-2xs">
+        <Sparkles size={13} className="text-ocean" />
+        <span>Evidence-Based Medical Study & Guideline Explorer</span>
       </div>
-
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-ocean">
-        3-Layer Triad Knowledge Base
-      </p>
 
       <h1 className="font-display text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-        NeuroEvidence Clinical Assistant
+        NeuroEvidence
       </h1>
 
-      <p className="mx-auto mt-3 max-w-xl text-xs sm:text-sm leading-relaxed text-neutral-500">
-        Clinical reasoning assistant grounded in <strong>NCBI Bookshelf</strong>,{' '}
-        <strong>NICE Guidelines (NG217 & NG71)</strong>, and <strong>PMC / Cochrane RCTs</strong> with claim-level NLI verification.
+      <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-neutral-600">
+        Clinical inquiry and guideline reasoning tool grounded in peer-reviewed literature, designed for medical students and neurology trainees studying <strong>{domainLabel}</strong>.
       </p>
 
-      {/* Triad Layer Pills */}
-      <div className="mx-auto mt-6 flex flex-wrap items-center justify-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-800">
-          <BookOpen size={12} /> Layer 1: Bookshelf / StatPearls
+      {/* Trust & Verification Feature Highlights */}
+      <div className="mx-auto mt-6 flex flex-wrap items-center justify-center gap-4 text-xs font-semibold text-neutral-600">
+        <span className="inline-flex items-center gap-1.5">
+          <ShieldCheck size={14} className="text-emerald-600" />
+          NICE Guidelines (NG217 & NG71)
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
-          <ShieldCheck size={12} /> Layer 2: NICE NG217 & NG71
+        <span className="text-neutral-400">•</span>
+        <span className="inline-flex items-center gap-1.5">
+          <Stethoscope size={14} className="text-ocean" />
+          PubMed & Cochrane RCTs
         </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-800">
-          <FlaskConical size={12} /> Layer 3: SANAD II & Cochrane Trials
+        <span className="text-neutral-400">•</span>
+        <span className="inline-flex items-center gap-1.5">
+          <Pill size={14} className="text-purple-600" />
+          Automated DDI Safety Checks
         </span>
-        <button
-          onClick={onOpenTriad}
-          className="inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1 text-xs font-semibold text-white transition hover:bg-ocean"
-        >
-          <Layers size={12} /> Architecture
-        </button>
       </div>
 
-      {/* Starter Prompts Grid */}
+      {/* Suggested Inquiries Reacting to Current Folder Domain */}
       <div className="mx-auto mt-8 grid max-w-3xl gap-3 text-left sm:grid-cols-2">
-        {starterQuestions.map((item, idx) => (
+        {questions.map((item, idx) => (
           <button
             key={idx}
             onClick={() => submit(item.query)}
-            className="group flex flex-col justify-between rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:border-ocean/40 hover:shadow-xs"
+            className="group flex flex-col justify-between rounded-2xl border border-neutral-200/90 bg-white p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:border-ocean/50 hover:shadow-xs active:translate-y-0"
           >
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-xs font-semibold text-ink group-hover:text-ocean transition">
+            <div>
+              {/* Category label with ample internal margin & high contrast */}
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600">
+                  {item.category}
+                </span>
+                <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-[10px] font-bold text-neutral-700 group-hover:bg-mint group-hover:text-ocean transition">
+                  {item.badge}
+                </span>
+              </div>
+              <h2 className="text-xs font-bold text-ink group-hover:text-ocean transition leading-snug">
                 {item.title}
-              </span>
-              <ArrowUp
-                size={14}
-                className="mt-0.5 shrink-0 rotate-45 text-neutral-300 transition group-hover:rotate-90 group-hover:text-ocean"
-              />
+              </h2>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-neutral-600 line-clamp-2">
+                {item.query}
+              </p>
             </div>
-            <p className="mt-1 text-[11px] leading-relaxed text-neutral-400 line-clamp-2">
-              {item.query}
-            </p>
-            <div className="mt-3">
-              <span className="rounded bg-neutral-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-neutral-500">
-                {item.tag}
-              </span>
+            <div className="mt-3.5 flex items-center justify-end text-[11px] font-semibold text-ocean opacity-0 transition group-hover:opacity-100">
+              <span>Explore question</span>
+              <ArrowUp size={12} className="ml-1 rotate-45" />
             </div>
           </button>
         ))}
@@ -189,7 +266,11 @@ function MessageItem({ message }) {
 
 function AssistantMessageCard({ result }) {
   const [copied, setCopied] = useState(false)
-  const [inspectionOpen, setInspectionOpen] = useState(true)
+  const [inspectionOpen, setInspectionOpen] = useState(false)
+
+  const isResearcherMode =
+    typeof window !== 'undefined' &&
+    localStorage.getItem('neuroevidence_research_mode') === 'true'
 
   function copyAnswer() {
     if (!result?.answer) return
@@ -221,7 +302,7 @@ function AssistantMessageCard({ result }) {
         )}
         {result.mode === 'baseline' && (
           <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-            Cloud Baseline (Gemini)
+            Cloud Baseline (Zero-Shot)
           </span>
         )}
         {result.mode === 'ollama_baseline' && (
@@ -239,12 +320,12 @@ function AssistantMessageCard({ result }) {
             {result.citations.length} triad sources
           </span>
         )}
-        {result.original_answer && (
+        {isResearcherMode && result.original_answer && (
           <span className="rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[10px] font-bold text-sky-800">
             Revised via Verification
           </span>
         )}
-        {result.subqueries?.length > 1 && (
+        {isResearcherMode && result.subqueries?.length > 1 && (
           <span className="rounded-full bg-violet-50 border border-violet-200 px-2 py-0.5 text-[10px] font-bold text-violet-800">
             {result.subqueries.length} decomposed subqueries
           </span>
@@ -253,8 +334,8 @@ function AssistantMessageCard({ result }) {
 
       {/* Main Response Box */}
       <div className="rounded-3xl border border-neutral-200/80 bg-white p-5 sm:p-7 shadow-soft">
-        {/* Selective Query Decomposition (Multi-Part inquiries) */}
-        {result.subqueries?.length > 1 && (
+        {/* Selective Query Decomposition (Multi-Part inquiries - shown in Researcher Mode) */}
+        {isResearcherMode && result.subqueries?.length > 1 && (
           <SubqueryDecompositionPanel subqueries={result.subqueries} />
         )}
 
@@ -486,6 +567,8 @@ function renderClaimText(rawClaim) {
 }
 
 function VerificationSection({ result, isOpen, onToggle }) {
+  const [activeFilter, setActiveFilter] = useState('all') // 'all' | 'flagged' | 'supported'
+
   const score = result.evidence_score != null ? Math.round(result.evidence_score * 100) : null
   const passed = result.evidence_score != null && result.evidence_score >= (result.evidence_threshold || 0.6)
 
@@ -493,6 +576,28 @@ function VerificationSection({ result, isOpen, onToggle }) {
   const l1Count = citations.filter((c) => (c.layer || 1) === 1).length
   const l2Count = citations.filter((c) => c.layer === 2).length
   const l3Count = citations.filter((c) => c.layer === 3).length
+
+  const claims = result.claim_checks || []
+  const supportedClaims = claims.filter((c) => c.label === 'supported')
+  const flaggedClaims = claims.filter((c) => c.label !== 'supported')
+
+  const visibleClaims =
+    activeFilter === 'supported'
+      ? supportedClaims
+      : activeFilter === 'flagged'
+      ? flaggedClaims
+      : claims
+
+  const isResearcherMode =
+    typeof window !== 'undefined' &&
+    localStorage.getItem('neuroevidence_research_mode') === 'true'
+
+  // Only show the revision audit box if researcher mode is ON AND an actual revision occurred
+  const showRevisionAudit = Boolean(
+    isResearcherMode &&
+    result.original_answer &&
+    result.original_answer.trim() !== result.answer?.trim()
+  )
 
   return (
     <div className="mt-6 rounded-2xl border border-neutral-200/80 bg-[#fafbfa] overflow-hidden">
@@ -505,9 +610,16 @@ function VerificationSection({ result, isOpen, onToggle }) {
             <FileCheck2 size={17} />
           </div>
           <div>
-            <div className="text-xs sm:text-sm font-bold text-ink">Verification & Claim Checks</div>
-            <div className="text-[11px] text-neutral-400">
-              3-Layer Triad distribution and PubMedBERT NLI claim scoring
+            <div className="text-xs sm:text-sm font-bold text-ink flex items-center gap-2">
+              <span>Evidence Verification & Claim Entailment</span>
+              {claims.length > 0 && (
+                <span className="text-[11px] font-normal text-neutral-500">
+                  ({supportedClaims.length}/{claims.length} verified)
+                </span>
+              )}
+            </div>
+            <div className="text-[11px] text-neutral-500">
+              PubMedBERT NLI claim scoring against retrieved guideline excerpts
             </div>
           </div>
         </div>
@@ -591,32 +703,110 @@ function VerificationSection({ result, isOpen, onToggle }) {
             </div>
           )}
 
-          {/* Claim-Level Statements */}
-          {result.claim_checks?.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-                Verified Factual Statements ({result.claim_checks.length})
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {result.claim_checks.map((claim, idx) => {
-                  const config = {
-                    supported: [CheckCircle2, 'text-emerald-700', 'bg-emerald-50', 'Supported'],
-                    contradicted: [XCircle, 'text-red-700', 'bg-red-50', 'Contradicted'],
-                    insufficient: [CircleHelp, 'text-amber-700', 'bg-amber-50', 'Insufficient'],
-                  }[claim.label] || [Info, 'text-neutral-700', 'bg-neutral-50', claim.label]
+          {/* Claim-Level Statements with Summary and Filter Tabs */}
+          {claims.length > 0 && (
+            <div className="space-y-3 pt-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200/70 pb-2.5">
+                <div>
+                  <div className="text-xs font-bold text-ink">
+                    Individual Claim Verification Audit
+                  </div>
+                  <div className="text-[11px] text-neutral-500">
+                    {supportedClaims.length} statements confirmed by evidence · {flaggedClaims.length} need direct citations
+                  </div>
+                </div>
 
-                  const [Icon, color, bg, label] = config
+                {/* Filter Controls */}
+                <div className="inline-flex rounded-lg border border-neutral-200 bg-white p-0.5 text-xs shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilter('all')}
+                    className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${
+                      activeFilter === 'all'
+                        ? 'bg-ink text-white'
+                        : 'text-neutral-600 hover:text-ink'
+                    }`}
+                  >
+                    All ({claims.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilter('flagged')}
+                    className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${
+                      activeFilter === 'flagged'
+                        ? 'bg-amber-600 text-white'
+                        : 'text-amber-800 hover:bg-amber-50'
+                    }`}
+                  >
+                    Needs Evidence ({flaggedClaims.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveFilter('supported')}
+                    className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition ${
+                      activeFilter === 'supported'
+                        ? 'bg-emerald-700 text-white'
+                        : 'text-emerald-800 hover:bg-emerald-50'
+                    }`}
+                  >
+                    Verified ({supportedClaims.length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Claims List */}
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {visibleClaims.map((claim, idx) => {
+                  const isSupported = claim.label === 'supported'
+                  const isContradicted = claim.label === 'contradicted'
+
+                  const config = {
+                    supported: [CheckCircle2, 'text-emerald-700', 'bg-emerald-50/70', 'border-emerald-200', 'Supported'],
+                    contradicted: [XCircle, 'text-red-700', 'bg-red-50/70', 'border-red-200', 'Contradicted'],
+                    insufficient: [CircleHelp, 'text-amber-700', 'bg-amber-50/70', 'border-amber-200', 'Insufficient Support'],
+                  }[claim.label] || [Info, 'text-neutral-700', 'bg-neutral-50', 'border-neutral-200', claim.label]
+
+                  const [Icon, color, bg, border, label] = config
+
+                  // Determine human-readable reason
+                  let reasonText = claim.explanation
+                  if (!reasonText || reasonText.includes('insufficient')) {
+                    if (!claim.citation_markers || claim.citation_markers.length === 0) {
+                      reasonText = 'No specific guideline marker attached to this sentence.'
+                    } else {
+                      reasonText = `Retrieved excerpt ${claim.citation_markers.join(', ')} does not provide direct textual entailment.`
+                    }
+                  } else if (isSupported) {
+                    reasonText = `Directly corroborated by ${claim.citation_markers.join(', ')} (${Math.round(claim.score * 100)}% entailment confidence).`
+                  }
 
                   return (
-                    <div key={idx} className={`rounded-xl border border-neutral-200/60 p-3 ${bg}`}>
-                      <div className="flex items-start gap-2">
-                        <Icon size={15} className={`shrink-0 mt-0.5 ${color}`} />
-                        <div>
-                          <p className="text-xs text-ink leading-snug">{renderClaimText(claim.claim)}</p>
-                          <p className={`mt-1.5 text-[10px] font-bold uppercase tracking-wider ${color}`}>
-                            {label} · {Math.round(claim.score * 100)}% · {claim.citation_markers.join(', ')}
-                          </p>
+                    <div
+                      key={idx}
+                      className={`flex flex-col justify-between rounded-xl border ${border} p-3.5 ${bg} transition`}
+                    >
+                      <div>
+                        <div className="flex items-start gap-2">
+                          <Icon size={16} className={`shrink-0 mt-0.5 ${color}`} />
+                          <div className="text-xs text-ink leading-relaxed">
+                            {renderClaimText(claim.claim)}
+                          </div>
                         </div>
+                      </div>
+
+                      {/* Explicit Reason & Context Box */}
+                      <div className="mt-2.5 pt-2 border-t border-neutral-200/50 flex flex-col gap-1">
+                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider">
+                          <span className={color}>{label}</span>
+                          {claim.citation_markers?.length > 0 && (
+                            <span className="font-semibold text-neutral-600">
+                              Sources: {claim.citation_markers.join(', ')}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-neutral-600 leading-normal font-normal">
+                          💡 <span className="font-medium text-neutral-700">Audit Reason:</span> {reasonText}
+                        </p>
                       </div>
                     </div>
                   )
@@ -625,15 +815,15 @@ function VerificationSection({ result, isOpen, onToggle }) {
             </div>
           )}
 
-          {/* Bounded Answer Revision Trace */}
-          {result.original_answer && (
+          {/* Bounded Answer Revision Trace (Shown only in Researcher Mode when genuine revision occurred) */}
+          {showRevisionAudit && (
             <div className="rounded-xl border border-sky-200/80 bg-sky-50/50 p-3 text-xs">
               <div className="flex items-center justify-between mb-1">
                 <span className="font-bold text-sky-950 flex items-center gap-1.5">
                   <ShieldCheck size={14} className="text-sky-700" /> Bounded Answer Revision Audit
                 </span>
-                <span className="text-[10px] font-semibold text-sky-800">
-                  Initial Draft Retained
+                <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800">
+                  Hallucination Repair Applied
                 </span>
               </div>
               <p className="text-[11px] text-sky-900/80 leading-relaxed mb-2">
@@ -907,13 +1097,20 @@ function ThinkingIndicator() {
   )
 }
 
-function ChatComposer({ question, setQuestion, submit, loading, mode }) {
+function ChatComposer({ question, setQuestion, submit, loading, mode, activeFolder }) {
   function handleKeyDown(event) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       submit()
     }
   }
+
+  const placeholderText =
+    activeFolder?.id === 'f-pd'
+      ? "Ask a study or guideline question about Parkinson's disease..."
+      : activeFolder?.id === 'f-epi'
+      ? 'Ask a study or guideline question about Epilepsy & Seizures...'
+      : "Ask a study question about Parkinson's or Epilepsy guidelines..."
 
   return (
     <div>
@@ -924,8 +1121,8 @@ function ChatComposer({ question, setQuestion, submit, loading, mode }) {
           onKeyDown={handleKeyDown}
           rows={1}
           maxLength={4000}
-          placeholder="Ask a clinical question about Parkinson's or Epilepsy..."
-          className="max-h-36 min-h-[42px] flex-1 resize-none border-0 bg-transparent px-2 py-2.5 text-xs sm:text-sm outline-none placeholder:text-neutral-400"
+          placeholder={placeholderText}
+          className="max-h-36 min-h-[42px] flex-1 resize-none border-0 bg-transparent px-2 py-2.5 text-xs sm:text-sm outline-none placeholder:text-neutral-500 text-ink"
         />
         <button
           onClick={() => submit()}
@@ -936,17 +1133,33 @@ function ChatComposer({ question, setQuestion, submit, loading, mode }) {
           <ArrowUp size={16} />
         </button>
       </div>
-      <div className="mt-2 flex items-center justify-between px-1 text-[10px] text-neutral-400">
+      <div className="mt-2 flex items-center justify-between px-1 text-[11px] font-medium text-neutral-600">
         <span>Enter to send · Shift+Enter for new line</span>
-        <span>
-          {mode === 'rag_verified'
-            ? 'Cloud RAG: Gemini + Triad + NLI Entailment'
-            : mode === 'ollama_rag'
-            ? 'Local RAG: Ollama + Triad + NLI Entailment'
-            : mode === 'ollama_baseline'
-            ? 'Local Baseline: Ollama (On-Device Zero-Shot)'
-            : 'Cloud Baseline: Gemini (Parametric Zero-Shot)'}
-        </span>
+        <div className="group relative cursor-help inline-flex items-center gap-1 text-neutral-600 hover:text-ink">
+          <span>
+            {mode === 'rag_verified'
+              ? 'Cloud RAG: Triad Evidence + NLI Verification'
+              : mode === 'ollama_rag'
+              ? 'Local RAG: Ollama + Triad Evidence + NLI'
+              : mode === 'ollama_baseline'
+              ? 'Local Baseline: Ollama (Zero-Shot)'
+              : 'Cloud Baseline: Zero-Shot (No RAG)'}
+          </span>
+          <Info size={12} className="text-neutral-500 group-hover:text-ocean" />
+
+          {/* Educational Tooltip explaining the 3-layer Triad */}
+          <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden w-72 rounded-xl border border-neutral-200 bg-white p-3 text-left shadow-lg group-hover:block z-50">
+            <div className="text-xs font-bold text-ink">What is Triad Knowledge Base?</div>
+            <p className="mt-1 text-[11px] text-neutral-600 leading-relaxed font-normal">
+              A hierarchical multi-source medical retrieval architecture:
+            </p>
+            <ul className="mt-1.5 space-y-1 text-[10px] text-neutral-600 font-normal">
+              <li>• <strong className="text-ink">Layer 1:</strong> Foundational medical concepts (StatPearls / Bookshelf)</li>
+              <li>• <strong className="text-ink">Layer 2:</strong> Approved clinical guidelines (NICE NG217 & NG71)</li>
+              <li>• <strong className="text-ink">Layer 3:</strong> High-impact clinical trials (SANAD II & Cochrane RCTs)</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   )

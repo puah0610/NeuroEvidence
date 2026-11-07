@@ -75,7 +75,7 @@ export default function EvaluationView({ summary }) {
             data={summary?.by_mode}
             labels={{
               rag_verified: 'Verified RAG (Proposed)',
-              baseline: 'Cloud Baseline (Gemini)',
+              baseline: 'Cloud Baseline (Zero-Shot)',
               ollama_baseline: 'Local Baseline (Ollama)',
             }}
           />

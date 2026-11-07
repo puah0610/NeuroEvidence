@@ -49,6 +49,17 @@ export default function Sidebar({
   const [movingSessionId, setMovingSessionId] = useState(null)
   const [dragOverFolderId, setDragOverFolderId] = useState(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [researchMode, setResearchMode] = useState(() => {
+    return localStorage.getItem('neuroevidence_research_mode') === 'true'
+  })
+
+  function toggleResearchMode() {
+    setResearchMode((prev) => {
+      const next = !prev
+      localStorage.setItem('neuroevidence_research_mode', String(next))
+      return next
+    })
+  }
 
   const newChatMenuRef = useRef(null)
   const moveMenuRef = useRef(null)
@@ -457,33 +468,53 @@ export default function Sidebar({
             </div>
           </div>
 
-          {/* Research & Benchmarks */}
-          <div>
-            <div className="mb-1 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
-              Evaluation & Benchmarks
-            </div>
-            <div className="space-y-0.5">
+          {/* Research & Benchmarks (Behind Researcher Mode Toggle) */}
+          <div className="rounded-xl border border-neutral-200/80 bg-neutral-50/70 p-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-600">
+                Researcher Mode
+              </span>
               <button
-                onClick={() => {
-                  setView('evaluation')
-                  onClose()
-                }}
-                className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-xs font-medium transition ${
-                  view === 'evaluation'
-                    ? 'bg-neutral-200/70 font-semibold text-ink'
-                    : 'text-neutral-600 hover:bg-neutral-100 hover:text-ink'
+                type="button"
+                onClick={toggleResearchMode}
+                className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  researchMode ? 'bg-ocean' : 'bg-neutral-300'
                 }`}
+                title="Toggle Researcher & Benchmark Mode"
+                aria-label="Toggle Researcher Mode"
               >
-                <div className="flex items-center gap-2.5">
-                  <BarChart3
-                    size={15}
-                    className={view === 'evaluation' ? 'text-ocean' : 'text-neutral-400'}
-                  />
-                  <span>Evaluation & Metrics</span>
-                </div>
-                <ChevronRight size={13} className="text-neutral-400" />
+                <span
+                  className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    researchMode ? 'translate-x-3' : 'translate-x-0'
+                  }`}
+                />
               </button>
             </div>
+
+            {researchMode && (
+              <div className="mt-2 space-y-1 pt-2 border-t border-neutral-200/80">
+                <button
+                  onClick={() => {
+                    setView('evaluation')
+                    onClose()
+                  }}
+                  className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                    view === 'evaluation'
+                      ? 'bg-neutral-200/90 text-ink'
+                      : 'text-neutral-700 hover:bg-neutral-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <BarChart3
+                      size={14}
+                      className={view === 'evaluation' ? 'text-ocean' : 'text-neutral-500'}
+                    />
+                    <span>Evaluation & Metrics</span>
+                  </div>
+                  <ChevronRight size={13} className="text-neutral-500" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Execution Mode Selector */}
@@ -502,7 +533,7 @@ export default function Sidebar({
               >
                 <ShieldCheck size={15} className="mt-0.5 shrink-0 text-ocean" />
                 <div>
-                  <div className="text-xs font-bold leading-none">Cloud RAG (Gemini)</div>
+                  <div className="text-xs font-bold leading-none">Cloud RAG (Verified)</div>
                   <div className="text-[10px] opacity-75 mt-0.5">Triad retrieval & NLI checks</div>
                 </div>
               </button>
@@ -516,7 +547,7 @@ export default function Sidebar({
               >
                 <Cloud size={15} className={`mt-0.5 shrink-0 ${mode === 'baseline' ? 'text-amber-600' : 'text-neutral-400'}`} />
                 <div>
-                  <div className="text-xs font-semibold leading-none">Cloud Baseline (Gemini)</div>
+                  <div className="text-xs font-semibold leading-none">Cloud Baseline</div>
                   <div className="text-[10px] opacity-75 mt-0.5">Parametric zero-shot (No RAG)</div>
                 </div>
               </button>
@@ -554,13 +585,13 @@ export default function Sidebar({
 
         {/* Bottom Left Footer: Research Pill & User Profile / Settings / Log Out */}
         <div className="mt-auto pt-2.5 border-t border-neutral-200/70 space-y-2">
-          {/* Subtle Research Disclaimer Pill */}
-          <div className="flex items-center justify-between px-1.5 text-[10px] text-neutral-400">
+          {/* Transparent Educational & Academic Tool Disclaimer */}
+          <div className="flex items-center justify-between rounded-lg bg-neutral-100/80 px-2 py-1 text-[11px] text-neutral-600">
             <div className="flex items-center gap-1.5">
               <HeartPulse size={12} className="text-coral shrink-0" />
-              <span className="font-semibold text-neutral-600">Research MVP</span>
+              <span className="font-semibold text-neutral-700">Educational Tool</span>
             </div>
-            <span className="text-[9px] text-neutral-400">Educational Use</span>
+            <span className="text-[10px] font-medium text-neutral-500">For Medical Study</span>
           </div>
 
           {/* User Profile Card & Action Bar */}
@@ -571,7 +602,7 @@ export default function Sidebar({
                 type="button"
                 onClick={() => setUserMenuOpen((prev) => !prev)}
                 className="flex items-center gap-2 min-w-0 flex-1 text-left rounded-lg p-1 hover:bg-neutral-50 transition"
-                title={`${userProfile?.name || 'Dr. Daniel'} (${userProfile?.role || 'Clinical Neurologist'})`}
+                title={`${userProfile?.name || 'Daniel Puah'} (${userProfile?.role || 'Medical Student / Researcher'})`}
               >
                 <div className="relative shrink-0">
                   <div className="grid h-7 w-7 place-items-center rounded-lg bg-ocean font-bold text-white text-[11px] shadow-2xs">
@@ -588,10 +619,10 @@ export default function Sidebar({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-semibold text-ink truncate leading-tight">
-                    {userProfile?.name || 'Dr. Daniel'}
+                    {userProfile?.name || 'Daniel Puah'}
                   </div>
-                  <div className="text-[10px] text-neutral-400 truncate leading-tight mt-0.5">
-                    {userProfile?.role || 'Clinical Neurologist'}
+                  <div className="text-[10px] text-neutral-500 font-medium truncate leading-tight mt-0.5">
+                    {userProfile?.role || 'Medical Student / Researcher'}
                   </div>
                 </div>
               </button>
