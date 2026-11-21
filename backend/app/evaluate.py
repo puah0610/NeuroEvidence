@@ -69,7 +69,7 @@ def run(
                 response = client.post(
                     "/api/chat",
                     json={
-                        "session_id": f"evaluation-{split}",
+                        "session_id": f"evaluation-{split}-{row['question_id']}-{mode}",
                         "question_id": row["question_id"],
                         "question": row["question"],
                         "mode": mode,
