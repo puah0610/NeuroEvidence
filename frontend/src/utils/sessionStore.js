@@ -183,38 +183,21 @@ export function formatSessionTimestamp(timestamp) {
 }
 
 export function getStoredAuth() {
+  // Always start on the Sign In screen whenever the application launches.
   try {
-    const raw = localStorage.getItem(STORAGE_AUTH_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (typeof parsed?.isAuthenticated === 'boolean') {
-        const accountRole =
-          parsed.accountRole === 'admin'
-            ? 'admin'
-            : parsed.accountRole === 'clinician'
-            ? 'clinician'
-            : null
-        const userId =
-          parsed.userId ||
-          (accountRole === 'admin' ? 'admin' : accountRole === 'clinician' ? 'puah' : null)
-        return {
-          isAuthenticated: parsed.isAuthenticated,
-          accountRole,
-          userId,
-        }
-      }
-    }
+    localStorage.removeItem(STORAGE_AUTH_KEY)
   } catch (e) {
-    console.error('Error loading auth state:', e)
+    console.error('Error clearing auth state:', e)
   }
-  return { isAuthenticated: true, accountRole: 'admin', userId: 'admin' }
+  return { isAuthenticated: false, accountRole: null, userId: null }
 }
 
-export function saveStoredAuth(authState) {
+export function saveStoredAuth() {
+  // Intentionally do not persist login state across application launches.
   try {
-    localStorage.setItem(STORAGE_AUTH_KEY, JSON.stringify(authState))
+    localStorage.removeItem(STORAGE_AUTH_KEY)
   } catch (e) {
-    console.error('Error saving auth state:', e)
+    console.error('Error clearing auth state:', e)
   }
 }
 

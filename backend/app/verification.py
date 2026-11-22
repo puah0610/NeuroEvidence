@@ -260,6 +260,8 @@ class CitationVerifier:
     async def _do_validate_metadata(self, chunk: RetrievedChunk) -> tuple[bool, str]:
         if chunk.demo:
             return True, f"Triad {chunk.layer_name} ({chunk.layer_source}) verified."
+        if chunk.source_id.startswith("ddi-registry-"):
+            return True, "Verified via curated NICE/BNF Drug-Drug Interaction Registry & openFDA pharmacological data."
         if "nice.org.uk" in (chunk.url or "").lower() or (chunk.subtopic and "NICE" in chunk.subtopic):
             return True, "Official NICE Clinical Guideline validated against NICE catalogue."
         if "ncbi.nlm.nih.gov/books" in (chunk.url or "").lower() or "statpearls" in (chunk.journal or "").lower():

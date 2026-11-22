@@ -5,7 +5,7 @@ import re
 from functools import lru_cache
 
 from .client import ExternalDDIClient
-from .models import DDIInteraction, DDIReport, DDISeverity, DrugEntity
+from .models import DDIInteraction, DDIReport, DDISeverity, DrugEntity, FDALabelRecord
 from .registry import DDI_RULES, DRUG_ENTITIES
 
 SEVERITY_ORDER = {
@@ -78,6 +78,7 @@ class DDIChecker:
 
         # Call live openFDA API asynchronously for top pairs
         live_warnings: list[str] = []
+        live_fda_records: list[FDALabelRecord] = []
         if check_live_api and interactions_found:
             tasks = [
                 self.fda_client.fetch_fda_interaction(item.drug_a, item.drug_b)
@@ -88,6 +89,19 @@ class DDIChecker:
                 if isinstance(res, dict) and res.get("warning_text"):
                     live_warnings.append(
                         f"FDA Label ({res['drug_a'].title()} + {res['drug_b'].title()}): {res['warning_text']}"
+                    )
+                    live_fda_records.append(
+                        FDALabelRecord(
+                            drug_a=res["drug_a"],
+                            drug_b=res["drug_b"],
+                            warning_text=res["warning_text"],
+                            set_id=res.get("set_id"),
+                            brand_name=res.get("brand_name"),
+                            generic_name=res.get("generic_name"),
+                            label_url=res.get("label_url") or "https://dailymed.nlm.nih.gov/dailymed/",
+                            source=res.get("source") or "openFDA / NIH DailyMed (Official FDA Drug Label)",
+                            has_boxed_warning=bool(res.get("has_boxed_warning")),
+                        )
                     )
 
         has_interaction = len(interactions_found) > 0 or len(live_warnings) > 0
@@ -117,6 +131,7 @@ class DDIChecker:
             clinical_summary=clinical_summary,
             actionable_guidance=guidelines,
             live_fda_warnings=live_warnings,
+            live_fda_records=live_fda_records,
             source=source,
         )
 

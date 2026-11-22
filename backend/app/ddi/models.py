@@ -39,6 +39,18 @@ class DDIInteraction(BaseModel):
     evidence_layer: int = 2
 
 
+class FDALabelRecord(BaseModel):
+    drug_a: str
+    drug_b: str
+    warning_text: str
+    set_id: str | None = None
+    brand_name: str | None = None
+    generic_name: str | None = None
+    label_url: str = "https://dailymed.nlm.nih.gov/dailymed/"
+    source: str = "openFDA / NIH DailyMed (Official FDA Drug Label)"
+    has_boxed_warning: bool = False
+
+
 class DDIReport(BaseModel):
     has_interaction: bool = False
     drugs_detected: list[str] = Field(default_factory=list)
@@ -48,4 +60,5 @@ class DDIReport(BaseModel):
     clinical_summary: str = ""
     actionable_guidance: list[str] = Field(default_factory=list)
     live_fda_warnings: list[str] = Field(default_factory=list)
+    live_fda_records: list[FDALabelRecord] = Field(default_factory=list)
     source: Literal["openfda_live", "curated_local", "hybrid"] = "curated_local"

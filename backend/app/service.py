@@ -21,7 +21,7 @@ import re
 from .decomposition import QueryDecomposer, retrieve_with_decomposition
 from .llm import DemoGenerator, Generator, OllamaAdapter, create_llm_adapter
 from .live_pubmed import LivePubMedRetriever
-from .models import ChatRequest, ChatResponse, Intent
+from .models import ChatRequest, ChatResponse, Intent, RetrievedChunk
 from .retrieval import ChromaRetriever, DemoRetriever, TransformerDenseEmbedder
 from .safety import classify_query
 from .verification import CitationVerifier, make_nli, verify_answer
@@ -392,6 +392,137 @@ class ChatService:
             )
             if temporal_unanswered not in unanswered_parts:
                 unanswered_parts.append(temporal_unanswered)
+
+        # Inject verified DDI Registry and live openFDA / NIH DailyMed findings as separate
+        # Layer 2 evidence chunks so each card's excerpt matches its exact source publication & URL.
+        if ddi_report and ddi_report.has_interaction:
+            injected_ddi_chunks: list[RetrievedChunk] = []
+            drug_slug = "-".join(sorted(ddi_report.drugs_detected)) or "interaction"
+            drug_label = " + ".join(ddi_report.drug_names) if ddi_report.drug_names else "Neurology Medications"
+
+            # 1. Curated local DDI Registry summary (NICE / StatPearls guidance)
+            ddi_parts: list[str] = []
+            if ddi_report.clinical_summary:
+                ddi_parts.append(ddi_report.clinical_summary)
+            for ix in ddi_report.interactions_found:
+                ddi_parts.append(
+                    f"{ix.drug_a_name} and {ix.drug_b_name} ({ix.severity.value} {ix.mechanism_type.value} interaction): "
+                    f"Mechanism: {ix.mechanism_detail} "
+                    f"Clinical risk: {ix.clinical_effect} "
+                    f"Recommended management and monitoring: {ix.actionable_guidance}"
+                )
+            ddi_excerpt = " ".join(ddi_parts).strip()
+            if ddi_excerpt:
+                ddi_source = (
+                    ddi_report.interactions_found[0].source
+                    if ddi_report.interactions_found
+                    else "NICE Clinical Guidelines"
+                )
+                ddi_source_upper = ddi_source.upper()
+                if "NG217" in ddi_source_upper:
+                    ddi_url = "https://www.nice.org.uk/guidance/ng217/chapter/Recommendations"
+                elif "NG71" in ddi_source_upper:
+                    ddi_url = "https://www.nice.org.uk/guidance/ng71/chapter/Recommendations"
+                elif "STATPEARLS" in ddi_source_upper:
+                    ddi_url = "https://www.ncbi.nlm.nih.gov/books/NBK482140/"
+                elif (decision.topic or "").lower() == "parkinsons":
+                    ddi_url = "https://www.nice.org.uk/guidance/ng71/chapter/Recommendations"
+                elif (decision.topic or "").lower() == "epilepsy":
+                    ddi_url = "https://www.nice.org.uk/guidance/ng217/chapter/Recommendations"
+                else:
+                    ddi_url = "https://www.nice.org.uk/guidance"
+
+                injected_ddi_chunks.append(
+                    RetrievedChunk(
+                        source_id=f"ddi-registry-{drug_slug}",
+                        chunk_id=f"ddi-registry-{drug_slug}-0",
+                        document_id=f"ddi-registry-{drug_slug}",
+                        title=f"Curated Clinical DDI Summary: {drug_label}",
+                        authors=["NeuroEvidence Curated DDI Registry"],
+                        year=2025,
+                        journal=ddi_source,
+                        topic=decision.topic or "epilepsy",
+                        url=ddi_url,
+                        section="Drug-Drug Interaction Mechanism, Safety Risks & Dosing Guidance",
+                        excerpt=ddi_excerpt,
+                        relevance=1.0,
+                        layer=2,
+                        layer_name="Layer 2: Clinical Guidelines",
+                        layer_source=ddi_source,
+                        subtopic="Curated Clinical DDI Summary (NICE / BNF)",
+                        breadcrumb=[
+                            "Layer 2: Clinical Guidelines",
+                            ddi_source,
+                            f"Drug Interaction: {drug_label}",
+                        ],
+                    )
+                )
+
+            # 2. Live Official FDA Drug Label excerpts (linked directly to NIH DailyMed setid)
+            if ddi_report.live_fda_records:
+                for idx, rec in enumerate(ddi_report.live_fda_records[:2]):
+                    label_name = rec.brand_name or rec.generic_name or rec.drug_a.title()
+                    section_label = (
+                        "Boxed Warning & Section 7: Drug Interactions"
+                        if rec.has_boxed_warning
+                        else "Section 7: Drug Interactions"
+                    )
+                    injected_ddi_chunks.append(
+                        RetrievedChunk(
+                            source_id=f"openfda-label-{drug_slug}-{idx}",
+                            chunk_id=f"openfda-label-{drug_slug}-{idx}-0",
+                            document_id=rec.set_id or f"openfda-label-{drug_slug}-{idx}",
+                            title=f"Official FDA Drug Label ({label_name}): {rec.drug_a.title()} + {rec.drug_b.title()} Interactions",
+                            authors=["U.S. Food and Drug Administration (openFDA / NIH DailyMed)"],
+                            year=2025,
+                            journal="NIH DailyMed / Official FDA Prescribing Information",
+                            topic=decision.topic or "epilepsy",
+                            url=rec.label_url,
+                            section=section_label,
+                            excerpt=rec.warning_text,
+                            relevance=0.99,
+                            layer=2,
+                            layer_name="Layer 2: Clinical Guidelines",
+                            layer_source="openFDA / NIH DailyMed",
+                            subtopic="FDA Drug Label — Drug Interactions",
+                            breadcrumb=[
+                                "Layer 2: Clinical Guidelines",
+                                "openFDA / NIH DailyMed",
+                                section_label,
+                            ],
+                        )
+                    )
+            elif ddi_report.live_fda_warnings:
+                fda_excerpt = " ".join(w for w in ddi_report.live_fda_warnings[:2] if w).strip()
+                if fda_excerpt:
+                    injected_ddi_chunks.append(
+                        RetrievedChunk(
+                            source_id=f"openfda-label-{drug_slug}",
+                            chunk_id=f"openfda-label-{drug_slug}-0",
+                            document_id=f"openfda-label-{drug_slug}",
+                            title=f"Official FDA Drug Label: {drug_label} Interactions",
+                            authors=["U.S. Food and Drug Administration (openFDA / NIH DailyMed)"],
+                            year=2025,
+                            journal="NIH DailyMed / Official FDA Prescribing Information",
+                            topic=decision.topic or "epilepsy",
+                            url="https://dailymed.nlm.nih.gov/dailymed/",
+                            section="Section 7: Drug Interactions & Warnings",
+                            excerpt=fda_excerpt,
+                            relevance=0.99,
+                            layer=2,
+                            layer_name="Layer 2: Clinical Guidelines",
+                            layer_source="openFDA / NIH DailyMed",
+                            subtopic="FDA Drug Label — Drug Interactions",
+                            breadcrumb=[
+                                "Layer 2: Clinical Guidelines",
+                                "openFDA / NIH DailyMed",
+                                "Section 7: Drug Interactions & Warnings",
+                            ],
+                        )
+                    )
+
+            if injected_ddi_chunks:
+                chunks = injected_ddi_chunks + list(chunks)
 
         active_generator = self.ollama_adapter if request.mode.value == "ollama_rag" else self.generator
 

@@ -63,11 +63,26 @@ class ExternalDDIClient:
                         break
 
                 if relevant_sentences:
+                    set_id = label.get("set_id")
+                    openfda = label.get("openfda") if isinstance(label.get("openfda"), dict) else {}
+                    brand_names = openfda.get("brand_name") or []
+                    generic_names = openfda.get("generic_name") or []
+                    brand_name = brand_names[0] if isinstance(brand_names, list) and brand_names else None
+                    generic_name = generic_names[0] if isinstance(generic_names, list) and generic_names else None
+                    label_url = (
+                        f"https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid={set_id}"
+                        if set_id
+                        else f"https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query={drug_a}"
+                    )
                     return {
                         "drug_a": drug_a,
                         "drug_b": drug_b,
                         "warning_text": " ".join(relevant_sentences[:3]),
-                        "source": "openFDA Drug Label API (Official FDA Label)",
+                        "set_id": set_id,
+                        "brand_name": brand_name,
+                        "generic_name": generic_name,
+                        "label_url": label_url,
+                        "source": "openFDA / NIH DailyMed (Official FDA Drug Label)",
                         "has_boxed_warning": bool(boxed_warnings),
                     }
         except (httpx.RequestError, httpx.TimeoutException, Exception) as exc:
