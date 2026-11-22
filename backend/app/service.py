@@ -166,7 +166,7 @@ class ChatService:
                 demo_mode=self.settings.demo_mode,
                 created_at=datetime.now(UTC),
             )
-            self.database.save_trace(request.session_id, request.question, result)
+            self.database.save_trace(request.session_id, request.question, result, user_id=request.user_id)
             return result
 
         if request.mode.value == "baseline":
@@ -200,7 +200,7 @@ class ChatService:
                 demo_mode=self.settings.demo_mode,
                 created_at=datetime.now(UTC),
             )
-            self.database.save_trace(request.session_id, request.question, result)
+            self.database.save_trace(request.session_id, request.question, result, user_id=request.user_id)
             return result
 
         if request.mode.value == "ollama_baseline":
@@ -234,7 +234,7 @@ class ChatService:
                 demo_mode=self.settings.demo_mode,
                 created_at=datetime.now(UTC),
             )
-            self.database.save_trace(request.session_id, request.question, result)
+            self.database.save_trace(request.session_id, request.question, result, user_id=request.user_id)
             return result
 
         # Scan query for drug interactions (combining local rules & live openFDA API)
@@ -431,7 +431,7 @@ class ChatService:
                 demo_mode=self.settings.demo_mode,
                 created_at=datetime.now(UTC),
             )
-            self.database.save_trace(request.session_id, request.question, result)
+            self.database.save_trace(request.session_id, request.question, result, user_id=request.user_id)
             return result
 
         active_generator = self.ollama_adapter if request.mode.value == "ollama_rag" else self.generator
@@ -646,7 +646,7 @@ class ChatService:
             demo_mode=self.settings.demo_mode,
             created_at=datetime.now(UTC),
         )
-        self.database.save_trace(request.session_id, request.question, result)
+        self.database.save_trace(request.session_id, request.question, result, user_id=request.user_id)
         return result
 
     def get_source(self, source_id: str):

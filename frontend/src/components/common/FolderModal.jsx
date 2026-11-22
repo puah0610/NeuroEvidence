@@ -1,9 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FolderPlus, X } from 'lucide-react'
 
 export default function FolderModal({ isOpen, onClose, onCreateFolder }) {
   const [folderName, setFolderName] = useState('')
   const [folderColor, setFolderColor] = useState('#0E6B70')
+
+  useEffect(() => {
+    if (!isOpen) return
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
 
   if (!isOpen) return null
 
@@ -30,8 +39,14 @@ export default function FolderModal({ isOpen, onClose, onCreateFolder }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-xs fade-up">
-      <div className="relative w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-xs fade-up"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl"
+      >
         <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
           <div className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-mint text-ocean">

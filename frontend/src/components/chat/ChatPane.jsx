@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AlertCircle,
   AlertTriangle,
@@ -23,10 +23,11 @@ import {
   Stethoscope,
   ThumbsDown,
   ThumbsUp,
+  X,
   XCircle,
 } from 'lucide-react'
 import { api } from '../../api'
-import { cleanLatexMath, parseAnswerBlocks } from './chatUtils'
+import { cleanLatexMath, cleanSourceExcerpt, parseAnswerBlocks } from './chatUtils'
 
 const domainStarterQuestions = {
   'f-pd': [
@@ -116,14 +117,23 @@ export default function ChatPane({
   submit,
   loading,
   mode,
+  researchMode = false,
+  density = 'default',
+  showShortcuts = true,
   endRef,
   onOpenTriad,
   activeFolder,
 }) {
+  const isCompact = density === 'compact'
+
   return (
     <div className="flex h-full flex-col bg-white">
       {/* Messages Stream / Center Canvas */}
-      <div className="flex-1 overflow-y-auto px-4 py-8 sm:px-6 lg:px-8">
+      <div
+        className={`flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 ${
+          isCompact ? 'py-4' : 'py-8'
+        }`}
+      >
         <div className="mx-auto max-w-4xl">
           {messages.length === 0 ? (
             <WelcomeView
@@ -133,11 +143,16 @@ export default function ChatPane({
               activeFolder={activeFolder}
             />
           ) : (
-            <div className="space-y-6 pb-6">
+            <div className={isCompact ? 'space-y-3.5 pb-4' : 'space-y-6 pb-6'}>
               {messages.map((message, idx) => (
-                <MessageItem key={idx} message={message} />
+                <MessageItem
+                  key={idx}
+                  message={message}
+                  researchMode={researchMode}
+                  compact={isCompact}
+                />
               ))}
-              {loading && <ThinkingIndicator />}
+              {loading && <ThinkingIndicator mode={mode} />}
               <div ref={endRef} />
             </div>
           )}
@@ -154,6 +169,8 @@ export default function ChatPane({
             loading={loading}
             mode={mode}
             activeFolder={activeFolder}
+            onOpenTriad={onOpenTriad}
+            showShortcuts={showShortcuts}
           />
         </div>
       </div>
@@ -241,11 +258,15 @@ function WelcomeView({ submit, mode, onOpenTriad, activeFolder }) {
   )
 }
 
-function MessageItem({ message }) {
+function MessageItem({ message, researchMode = false, compact = false }) {
   if (message.role === 'user') {
     return (
       <div className="flex justify-end fade-up">
-        <div className="max-w-2xl rounded-2xl rounded-br-xs bg-ink px-4 py-3 text-xs sm:text-sm leading-relaxed text-white shadow-soft">
+        <div
+          className={`max-w-2xl rounded-2xl rounded-br-xs bg-ink text-xs sm:text-sm leading-relaxed text-white shadow-soft ${
+            compact ? 'px-3.5 py-2' : 'px-4 py-3'
+          }`}
+        >
           {message.text}
         </div>
       </div>
@@ -261,16 +282,15 @@ function MessageItem({ message }) {
     )
   }
 
-  return <AssistantMessageCard result={message.result} />
+  return <AssistantMessageCard result={message.result} researchMode={researchMode} compact={compact} />
 }
 
-function AssistantMessageCard({ result }) {
+function AssistantMessageCard({ result, researchMode = false, compact = false }) {
   const [copied, setCopied] = useState(false)
   const [inspectionOpen, setInspectionOpen] = useState(false)
+  const [inspectedSource, setInspectedSource] = useState(null)
 
-  const isResearcherMode =
-    typeof window !== 'undefined' &&
-    localStorage.getItem('neuroevidence_research_mode') === 'true'
+  const isResearcherMode = Boolean(researchMode)
 
   function copyAnswer() {
     if (!result?.answer) return
@@ -333,7 +353,11 @@ function AssistantMessageCard({ result }) {
       </div>
 
       {/* Main Response Box */}
-      <div className="rounded-3xl border border-neutral-200/80 bg-white p-5 sm:p-7 shadow-soft">
+      <div
+        className={`rounded-3xl border border-neutral-200/80 bg-white shadow-soft ${
+          compact ? 'p-4 sm:p-5' : 'p-5 sm:p-7'
+        }`}
+      >
         {/* Selective Query Decomposition (Multi-Part inquiries - shown in Researcher Mode) */}
         {isResearcherMode && result.subqueries?.length > 1 && (
           <SubqueryDecompositionPanel subqueries={result.subqueries} />
@@ -359,21 +383,41 @@ function AssistantMessageCard({ result }) {
 
         {/* Structured Answer Content */}
         <div className="text-xs sm:text-sm leading-relaxed text-ink/90">
-          <AnswerContent text={result.answer} citations={result.citations} />
+          <AnswerContent
+            text={result.answer}
+            citations={result.citations}
+            onInspectSource={setInspectedSource}
+          />
         </div>
 
         {/* Verification & Claim Entailment Panel */}
         {(result.mode === 'rag_verified' || result.mode === 'ollama_rag') && (
           <VerificationSection
             result={result}
+            researchMode={isResearcherMode}
             isOpen={inspectionOpen}
             onToggle={() => setInspectionOpen(!inspectionOpen)}
           />
         )}
 
-        {/* Retrieved Triad Sources */}
+        {/* Compact Retrieved Triad Sources Chip Strip */}
         {result.citations?.length > 0 && (
-          <SourcesSection citations={result.citations} />
+          <SourcesSection
+            traceId={result.trace_id}
+            citations={result.citations}
+            activeMarker={inspectedSource?.marker}
+            onInspectSource={setInspectedSource}
+          />
+        )}
+
+        {/* Source Inspector Slide-Over Drawer */}
+        {inspectedSource && (
+          <SourceInspectorDrawer
+            source={inspectedSource}
+            citations={result.citations || []}
+            onSelectSource={setInspectedSource}
+            onClose={() => setInspectedSource(null)}
+          />
         )}
 
         {/* Bottom Actions Bar */}
@@ -393,7 +437,7 @@ function AssistantMessageCard({ result }) {
   )
 }
 
-function AnswerContent({ text, citations = [] }) {
+function AnswerContent({ text, citations = [], onInspectSource }) {
   if (!text) return null
   const blocks = parseAnswerBlocks(text)
 
@@ -405,7 +449,7 @@ function AnswerContent({ text, citations = [] }) {
             <div key={idx} className="mb-2 mt-4 flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-ocean" />
               <h3 className="font-display text-base font-bold text-ink sm:text-lg">
-                {renderMarkers(block.content, citations)}
+                {renderMarkers(block.content, citations, onInspectSource)}
               </h3>
             </div>
           )
@@ -414,7 +458,7 @@ function AnswerContent({ text, citations = [] }) {
         if (block.type === 'h4') {
           return (
             <h4 key={idx} className="mb-1 mt-3 text-xs font-bold uppercase tracking-wider text-ocean">
-              {renderMarkers(block.content, citations)}
+              {renderMarkers(block.content, citations, onInspectSource)}
             </h4>
           )
         }
@@ -426,7 +470,7 @@ function AnswerContent({ text, citations = [] }) {
         if (block.type === 'disclaimer') {
           return (
             <p key={idx} className="mt-3 border-t border-neutral-100 pt-2 text-xs italic text-neutral-400">
-              {renderMarkers(block.content, citations)}
+              {renderMarkers(block.content, citations, onInspectSource)}
             </p>
           )
         }
@@ -440,7 +484,7 @@ function AnswerContent({ text, citations = [] }) {
               <div className="flex items-start gap-2.5">
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ocean" />
                 <div className="flex-1 text-sm leading-relaxed text-neutral-700">
-                  {renderMarkers(block.parent, citations)}
+                  {renderMarkers(block.parent, citations, onInspectSource)}
                 </div>
               </div>
 
@@ -448,7 +492,7 @@ function AnswerContent({ text, citations = [] }) {
                 <div className="mt-2.5 space-y-2 border-l-2 border-ocean/20 pl-3.5 sm:ml-2 sm:pl-4">
                   {block.children.map((child, cIdx) => (
                     <div key={cIdx} className="text-xs sm:text-sm leading-relaxed text-neutral-600">
-                      {renderMarkers(child, citations)}
+                      {renderMarkers(child, citations, onInspectSource)}
                     </div>
                   ))}
                 </div>
@@ -459,7 +503,7 @@ function AnswerContent({ text, citations = [] }) {
 
         return (
           <p key={idx} className="leading-7">
-            {renderMarkers(block.content, citations)}
+            {renderMarkers(block.content, citations, onInspectSource)}
           </p>
         )
       })}
@@ -469,7 +513,7 @@ function AnswerContent({ text, citations = [] }) {
 
 const CITATION_BRACKET_REGEX = /(\[\s*S\d+(?:[\s,;/&+\-–—]+S?\d+)*\s*\]|\*\*.*?\*\*)/g
 
-function renderMarkers(text, citations = []) {
+function renderMarkers(text, citations = [], onInspectSource) {
   const sanitized = cleanLatexMath(text)
   const pieces = sanitized.split(CITATION_BRACKET_REGEX)
   return pieces.map((piece, index) => {
@@ -493,31 +537,24 @@ function renderMarkers(text, citations = []) {
                 3: 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100',
               }[layer] || 'bg-mint text-ocean border-ocean/20'
 
-            const hasExternalUrl = Boolean(citation?.url && citation.url.startsWith('http'))
-
             return (
-              <a
+              <button
                 key={marker}
-                href={hasExternalUrl ? citation.url : '#sources'}
-                target={hasExternalUrl ? '_blank' : '_self'}
-                rel={hasExternalUrl ? 'noreferrer' : undefined}
-                onClick={
-                  !hasExternalUrl
-                    ? (e) => {
-                        e.preventDefault()
-                        document.getElementById('sources')?.scrollIntoView({ behavior: 'smooth' })
-                      }
-                    : undefined
-                }
+                type="button"
+                onClick={() => {
+                  if (citation && onInspectSource) {
+                    onInspectSource(citation)
+                  }
+                }}
                 title={
                   citation?.title
-                    ? `${citation.title} (${marker}) — Click to open external publication`
-                    : `${marker} — Click to view source details`
+                    ? `${citation.title} (${marker}) — Click to inspect retrieved chunk & provenance`
+                    : `${marker} — Click to inspect source`
                 }
-                className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-bold no-underline transition ${layerStyle}`}
+                className={`inline-flex cursor-pointer items-center rounded-md border px-1.5 py-0.5 text-xs font-bold no-underline transition ${layerStyle}`}
               >
                 {marker}
-              </a>
+              </button>
             )
           })}
         </span>
@@ -566,7 +603,7 @@ function renderClaimText(rawClaim) {
   return <span className="font-normal text-neutral-700">{cleaned.replace(/\*\*/g, '')}</span>
 }
 
-function VerificationSection({ result, isOpen, onToggle }) {
+function VerificationSection({ result, researchMode = false, isOpen, onToggle }) {
   const [activeFilter, setActiveFilter] = useState('all') // 'all' | 'flagged' | 'supported'
 
   const score = result.evidence_score != null ? Math.round(result.evidence_score * 100) : null
@@ -588,9 +625,7 @@ function VerificationSection({ result, isOpen, onToggle }) {
       ? flaggedClaims
       : claims
 
-  const isResearcherMode =
-    typeof window !== 'undefined' &&
-    localStorage.getItem('neuroevidence_research_mode') === 'true'
+  const isResearcherMode = Boolean(researchMode)
 
   // Only show the revision audit box if researcher mode is ON AND an actual revision occurred
   const showRevisionAudit = Boolean(
@@ -845,9 +880,30 @@ function VerificationSection({ result, isOpen, onToggle }) {
   )
 }
 
-function SourcesSection({ citations }) {
+const LAYER_CHIP_STYLES = {
+  1: {
+    pill: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+    chip: 'border-indigo-200/80 hover:border-indigo-400 hover:bg-indigo-50/40',
+    badge: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+    shortLabel: 'L1',
+  },
+  2: {
+    pill: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    chip: 'border-emerald-200/80 hover:border-emerald-400 hover:bg-emerald-50/40',
+    badge: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+    shortLabel: 'L2',
+  },
+  3: {
+    pill: 'bg-purple-50 text-purple-800 border-purple-200',
+    chip: 'border-purple-200/80 hover:border-purple-400 hover:bg-purple-50/40',
+    badge: 'bg-purple-50 text-purple-800 border-purple-200',
+    shortLabel: 'L3',
+  },
+}
+
+function SourcesSection({ traceId, citations, activeMarker, onInspectSource }) {
   return (
-    <div id="sources" className="mt-6 border-t border-neutral-100 pt-5">
+    <div id={`sources-${traceId || 'list'}`} className="mt-6 border-t border-neutral-100 pt-5">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-neutral-500">
           <BookOpen size={15} /> Retrieved Triad Sources
@@ -856,41 +912,265 @@ function SourcesSection({ citations }) {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        {citations.map((source) => (
-          <a
-            key={source.marker}
-            href={source.url}
-            target="_blank"
-            rel="noreferrer"
-            className="group flex flex-col justify-between rounded-2xl border border-neutral-200/80 bg-white p-3.5 no-underline transition hover:border-ocean/40 hover:shadow-2xs"
-          >
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-1.5">
-                <span className="rounded bg-mint px-1.5 py-0.5 text-[10px] font-bold text-ocean">
-                  {source.marker}
-                </span>
-                <span className="text-[10px] font-semibold text-neutral-400">
-                  {source.layer_source || `Layer ${source.layer}`}
-                </span>
+        {citations.map((source) => {
+          const style = LAYER_CHIP_STYLES[source.layer || 1] || LAYER_CHIP_STYLES[1]
+          const isSelected = activeMarker === source.marker
+          const cleanPreview = cleanSourceExcerpt(source.excerpt)
+          const hasExternalUrl = Boolean(source.url && source.url.startsWith('http'))
+
+          return (
+            <div
+              key={source.marker}
+              role="button"
+              tabIndex={0}
+              onClick={() => onInspectSource?.(source)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onInspectSource?.(source)
+                }
+              }}
+              className={`group flex cursor-pointer flex-col justify-between rounded-2xl border bg-white p-3.5 text-left transition hover:border-ocean/40 hover:shadow-2xs ${
+                isSelected ? 'border-ocean ring-2 ring-ocean/30' : 'border-neutral-200/80'
+              }`}
+              title="Click to inspect full retrieved excerpt & provenance"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span
+                    className={`rounded border px-1.5 py-0.5 text-[10px] font-bold ${style.pill}`}
+                  >
+                    {source.marker}
+                  </span>
+                  <span className="text-[10px] font-semibold text-neutral-400 truncate">
+                    {source.layer_source || `Layer ${source.layer}`}
+                  </span>
+                </div>
+                <h4 className="text-xs font-bold text-ink group-hover:text-ocean transition line-clamp-1">
+                  {source.title}
+                </h4>
+                <p className="mt-1 text-[11px] leading-relaxed text-neutral-500 line-clamp-2">
+                  {cleanPreview}
+                </p>
               </div>
-              <h4 className="text-xs font-bold text-ink group-hover:text-ocean transition line-clamp-1">
-                {source.title}
-              </h4>
-              <p className="mt-1 text-[11px] leading-relaxed text-neutral-500 line-clamp-2">
-                {source.excerpt}
+
+              <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-2 text-[10px]">
+                <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                  <CheckCircle2 size={11} /> Verified chunk
+                </span>
+                <div className="flex items-center gap-2.5">
+                  <span className="text-neutral-500 group-hover:text-ocean font-semibold transition">
+                    Inspect
+                  </span>
+                  {hasExternalUrl && (
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-ocean font-semibold flex items-center gap-1 no-underline hover:underline"
+                      title="Open original publication in new tab"
+                    >
+                      Open <ExternalLink size={10} />
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function SourceInspectorDrawer({ source, citations, onSelectSource, onClose }) {
+  const [copiedExcerpt, setCopiedExcerpt] = useState(false)
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  if (!source) return null
+
+  const style = LAYER_CHIP_STYLES[source.layer || 1] || LAYER_CHIP_STYLES[1]
+  const cleanedExcerpt = cleanSourceExcerpt(source.excerpt)
+  const hasExternalUrl = Boolean(source.url && source.url.startsWith('http'))
+  const breadcrumbText =
+    Array.isArray(source.breadcrumb) && source.breadcrumb.length > 0
+      ? source.breadcrumb.join(' › ')
+      : source.subtopic || null
+
+  function handleCopyExcerpt() {
+    if (!cleanedExcerpt) return
+    navigator.clipboard.writeText(cleanedExcerpt)
+    setCopiedExcerpt(true)
+    setTimeout(() => setCopiedExcerpt(false), 1800)
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex justify-end bg-ink/40 backdrop-blur-xs"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex h-full w-full max-w-lg flex-col border-l border-neutral-200 bg-white shadow-2xl fade-up"
+      >
+        {/* Drawer Header */}
+        <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-3.5 bg-neutral-50/60 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="grid h-7 w-7 place-items-center rounded-lg bg-mint text-ocean">
+              <BookOpen size={15} />
+            </div>
+            <div>
+              <h3 className="font-display text-sm font-bold text-ink">Source Inspector</h3>
+              <p className="text-[10px] text-neutral-400">
+                Chunk provenance, Triad evidence tier & identifiers
               </p>
             </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-200/70 hover:text-ink transition"
+            aria-label="Close source inspector"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-            <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-2 text-[10px]">
-              <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                <CheckCircle2 size={11} /> Verified chunk
+        {/* Quick-Switcher Pills for All Cited Sources in This Answer */}
+        {citations.length > 1 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto border-b border-neutral-100 px-5 py-2.5 bg-neutral-50/30 shrink-0">
+            {citations.map((item) => {
+              const itemStyle = LAYER_CHIP_STYLES[item.layer || 1] || LAYER_CHIP_STYLES[1]
+              const active = item.marker === source.marker
+              return (
+                <button
+                  key={item.marker}
+                  type="button"
+                  onClick={() => onSelectSource(item)}
+                  className={`shrink-0 rounded-lg border px-2 py-1 text-[11px] font-bold transition ${
+                    active
+                      ? 'bg-ink text-white border-ink shadow-2xs'
+                      : `${itemStyle.pill} opacity-80 hover:opacity-100`
+                  }`}
+                >
+                  {item.marker}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Drawer Content */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Layer Badge & Verification Status */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${style.badge}`}
+            >
+              {source.layer_name || `Layer ${source.layer || 1}`}
+            </span>
+            {source.layer_source && (
+              <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-[11px] font-semibold text-neutral-600">
+                {source.layer_source}
               </span>
-              <span className="text-ocean font-semibold flex items-center gap-1">
-                Open <ExternalLink size={10} />
+            )}
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+              <CheckCircle2 size={11} />
+              {source.metadata_valid !== false ? 'Verified Chunk' : 'Unverified Metadata'}
+            </span>
+          </div>
+
+          {/* Source Title & Breadcrumb */}
+          <div>
+            <h4 className="font-display text-base font-bold text-ink leading-snug">
+              {source.title}
+            </h4>
+            {breadcrumbText && (
+              <p className="mt-1 text-[11px] text-neutral-500">{breadcrumbText}</p>
+            )}
+          </div>
+
+          {/* Provenance Identifiers (DOI / PMID / PMCID / Source ID) */}
+          <div className="flex flex-wrap gap-1.5 text-[11px]">
+            {source.doi && (
+              <span className="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 font-mono text-neutral-700">
+                DOI: {source.doi}
               </span>
+            )}
+            {source.pmid && (
+              <span className="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 font-mono text-neutral-700">
+                PMID: {source.pmid}
+              </span>
+            )}
+            {source.pmcid && (
+              <span className="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 font-mono text-neutral-700">
+                PMCID: {source.pmcid}
+              </span>
+            )}
+            {source.source_id && (
+              <span className="rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1 font-mono text-neutral-500">
+                ID: {source.source_id}
+              </span>
+            )}
+          </div>
+
+          {/* Full Cleaned Clinical Excerpt */}
+          <div className="rounded-2xl border border-neutral-200/80 bg-neutral-50/70 p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
+                Retrieved Evidence Excerpt ({source.marker})
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyExcerpt}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold text-neutral-500 hover:bg-neutral-200/70 hover:text-ink transition"
+              >
+                {copiedExcerpt ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                <span>{copiedExcerpt ? 'Copied' : 'Copy'}</span>
+              </button>
             </div>
-          </a>
-        ))}
+            <p className="whitespace-pre-line text-xs leading-relaxed text-ink/90">
+              {cleanedExcerpt}
+            </p>
+          </div>
+
+          {source.verification_note && (
+            <div className="rounded-xl border border-neutral-200/70 bg-white p-3 text-[11px] text-neutral-600">
+              <span className="font-semibold text-ink">Verification Note: </span>
+              {source.verification_note}
+            </div>
+          )}
+        </div>
+
+        {/* Drawer Footer */}
+        <div className="flex items-center justify-between gap-2 border-t border-neutral-100 px-5 py-3.5 bg-neutral-50/60 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-xs font-semibold text-neutral-600 hover:bg-neutral-50 transition"
+          >
+            Close
+          </button>
+          {hasExternalUrl && (
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-xs font-semibold text-white no-underline shadow-xs hover:bg-ocean transition"
+            >
+              <span>Open Original Publication</span>
+              <ExternalLink size={13} />
+            </a>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -1043,10 +1323,10 @@ function DDIAlertCard({ report }) {
 }
 
 function FeedbackControls({ traceId }) {
-  const [state, setState] = useState('idle')
+  const [state, setState] = useState('idle') // 'idle' | 'saving' | 'saved' | 'error'
 
   async function send(helpful, issue_type = null) {
-    if (state !== 'idle') return
+    if (state === 'saving' || state === 'saved') return
     setState('saving')
     try {
       await api.feedback({ trace_id: traceId, helpful, issue_type })
@@ -1062,17 +1342,27 @@ function FeedbackControls({ traceId }) {
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-neutral-400 text-[11px]">Helpful?</span>
+      {state === 'error' ? (
+        <span className="text-red-600 text-[11px] font-medium">Save failed — retry:</span>
+      ) : (
+        <span className="text-neutral-400 text-[11px]">
+          {state === 'saving' ? 'Saving...' : 'Helpful?'}
+        </span>
+      )}
       <button
+        type="button"
+        disabled={state === 'saving'}
         onClick={() => send(true)}
-        className="rounded-md border border-neutral-200 p-1.5 text-neutral-500 hover:bg-mint hover:text-ocean transition"
+        className="rounded-md border border-neutral-200 p-1.5 text-neutral-500 hover:bg-mint hover:text-ocean transition disabled:opacity-40"
         title="Helpful"
       >
         <ThumbsUp size={13} />
       </button>
       <button
+        type="button"
+        disabled={state === 'saving'}
         onClick={() => send(false, 'unsupported_answer')}
-        className="rounded-md border border-neutral-200 p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-700 transition"
+        className="rounded-md border border-neutral-200 p-1.5 text-neutral-500 hover:bg-red-50 hover:text-red-700 transition disabled:opacity-40"
         title="Not helpful"
       >
         <ThumbsDown size={13} />
@@ -1081,7 +1371,16 @@ function FeedbackControls({ traceId }) {
   )
 }
 
-function ThinkingIndicator() {
+function ThinkingIndicator({ mode = 'rag_verified' }) {
+  const statusText =
+    mode === 'baseline'
+      ? 'Generating cloud parametric baseline response…'
+      : mode === 'ollama_baseline'
+      ? 'Generating local Ollama baseline response…'
+      : mode === 'ollama_rag'
+      ? 'Retrieving across 3-Layer Triad & verifying with local Ollama…'
+      : 'Retrieving across 3-Layer Triad & verifying NLI entailment…'
+
   return (
     <div className="flex items-center gap-2.5 text-xs text-neutral-400 py-2">
       <span className="grid h-6 w-6 place-items-center rounded-lg bg-ocean text-white">
@@ -1092,12 +1391,21 @@ function ThinkingIndicator() {
         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ocean [animation-delay:120ms]" />
         <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-ocean [animation-delay:240ms]" />
       </div>
-      <span className="text-[11px]">Retrieving across 3-Layer Triad & verifying NLI entailment…</span>
+      <span className="text-[11px]">{statusText}</span>
     </div>
   )
 }
 
-function ChatComposer({ question, setQuestion, submit, loading, mode, activeFolder }) {
+function ChatComposer({
+  question,
+  setQuestion,
+  submit,
+  loading,
+  mode,
+  activeFolder,
+  onOpenTriad,
+  showShortcuts = true,
+}) {
   function handleKeyDown(event) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
@@ -1113,7 +1421,7 @@ function ChatComposer({ question, setQuestion, submit, loading, mode, activeFold
       : "Ask a study question about Parkinson's or Epilepsy guidelines..."
 
   return (
-    <div>
+    <div className="ui-scale-original">
       <div className="flex items-end gap-2.5 rounded-2xl border border-neutral-200/90 bg-neutral-50/60 p-2 shadow-soft focus-within:border-ocean/60 focus-within:bg-white transition">
         <textarea
           value={question}
@@ -1134,11 +1442,16 @@ function ChatComposer({ question, setQuestion, submit, loading, mode, activeFold
         </button>
       </div>
       <div className="mt-2 flex items-center justify-between px-1 text-[11px] font-medium text-neutral-600">
-        <span>Enter to send · Shift+Enter for new line</span>
-        <div className="group relative cursor-help inline-flex items-center gap-1 text-neutral-600 hover:text-ink">
+        <span>{showShortcuts ? 'Enter to send · Shift+Enter for new line' : ''}</span>
+        <button
+          type="button"
+          onClick={onOpenTriad}
+          className="group relative cursor-pointer inline-flex items-center gap-1 text-neutral-600 hover:text-ocean transition"
+          title="Click to inspect the 3-Layer Triad Knowledge Base"
+        >
           <span>
             {mode === 'rag_verified'
-              ? 'Cloud RAG: Triad Evidence + NLI Verification'
+              ? 'Verified RAG: Triad Evidence + NLI Verification'
               : mode === 'ollama_rag'
               ? 'Local RAG: Ollama + Triad Evidence + NLI'
               : mode === 'ollama_baseline'
@@ -1151,7 +1464,7 @@ function ChatComposer({ question, setQuestion, submit, loading, mode, activeFold
           <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden w-72 rounded-xl border border-neutral-200 bg-white p-3 text-left shadow-lg group-hover:block z-50">
             <div className="text-xs font-bold text-ink">What is Triad Knowledge Base?</div>
             <p className="mt-1 text-[11px] text-neutral-600 leading-relaxed font-normal">
-              A hierarchical multi-source medical retrieval architecture:
+              A hierarchical multi-source medical retrieval architecture (click to view full overview):
             </p>
             <ul className="mt-1.5 space-y-1 text-[10px] text-neutral-600 font-normal">
               <li>• <strong className="text-ink">Layer 1:</strong> Foundational medical concepts (StatPearls / Bookshelf)</li>
@@ -1159,7 +1472,7 @@ function ChatComposer({ question, setQuestion, submit, loading, mode, activeFold
               <li>• <strong className="text-ink">Layer 3:</strong> High-impact clinical trials (SANAD II & Cochrane RCTs)</li>
             </ul>
           </div>
-        </div>
+        </button>
       </div>
     </div>
   )

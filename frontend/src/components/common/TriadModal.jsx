@@ -1,9 +1,24 @@
+import { useEffect } from 'react'
 import { BookOpen, FlaskConical, Layers, ShieldCheck, X } from 'lucide-react'
 
 export default function TriadModal({ onClose }) {
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-xs fade-up">
-      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-neutral-200 bg-white p-6 shadow-2xl sm:p-8">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-xs fade-up"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-neutral-200 bg-white p-6 shadow-2xl sm:p-8"
+      >
         <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-mint text-ocean">

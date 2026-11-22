@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Cloud,
   Cpu,
+  Edit2,
   FlaskConical,
   Folder,
   FolderInput,
@@ -19,7 +20,7 @@ import {
   Settings,
   ShieldCheck,
   Trash2,
-  User,
+  X,
 } from 'lucide-react'
 import { formatSessionTimestamp } from '../../utils/sessionStore'
 
@@ -34,31 +35,53 @@ export default function Sidebar({
   onSelectSession,
   onNewSession,
   onMoveSession,
+  onRenameSession,
   onOpenFolderModal,
   onDeleteSession,
   onDeleteFolder,
   onOpenTriad,
   mode,
   setMode,
+  isAdmin = false,
+  researchMode,
+  onToggleResearchMode,
   userProfile,
   onOpenSettings,
-  onLogOut,
+  onSignOut,
 }) {
   const [collapsedFolders, setCollapsedFolders] = useState({})
   const [newChatMenuOpen, setNewChatMenuOpen] = useState(false)
   const [movingSessionId, setMovingSessionId] = useState(null)
+  const [editingSessionId, setEditingSessionId] = useState(null)
+  const [editingTitle, setEditingTitle] = useState('')
   const [dragOverFolderId, setDragOverFolderId] = useState(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [researchMode, setResearchMode] = useState(() => {
-    return localStorage.getItem('neuroevidence_research_mode') === 'true'
-  })
 
-  function toggleResearchMode() {
-    setResearchMode((prev) => {
-      const next = !prev
-      localStorage.setItem('neuroevidence_research_mode', String(next))
-      return next
-    })
+  function startRenameSession(session, e) {
+    e.stopPropagation()
+    setMovingSessionId(null)
+    setEditingSessionId(session.id)
+    setEditingTitle(session.title || 'Untitled Session')
+  }
+
+  function saveRenameSession(sessionId) {
+    const clean = editingTitle.trim()
+    if (clean && onRenameSession) {
+      onRenameSession(sessionId, clean)
+    }
+    setEditingSessionId(null)
+    setEditingTitle('')
+  }
+
+  function cancelRenameSession() {
+    setEditingSessionId(null)
+    setEditingTitle('')
+  }
+
+  function closeIfMobile() {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      onClose()
+    }
   }
 
   const newChatMenuRef = useRef(null)
@@ -96,14 +119,14 @@ export default function Sidebar({
   function handleSelectSession(session) {
     onSelectSession(session.id)
     setView('chat')
-    onClose()
+    closeIfMobile()
   }
 
   function handleCreateInFolder(folderId) {
     onNewSession(folderId)
     setCollapsedFolders((prev) => ({ ...prev, [folderId]: false }))
     setView('chat')
-    onClose()
+    closeIfMobile()
   }
 
   return (
@@ -119,7 +142,7 @@ export default function Sidebar({
 
       {/* Sidebar Content */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col border-r border-neutral-200/80 bg-[#fbfbfa] px-3.5 pb-3.5 pt-3.5 transition-all duration-200 lg:static lg:h-[calc(100vh-60px)] ${
+        className={`ui-scale-original fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col border-r border-neutral-200/80 bg-[#fbfbfa] px-3.5 pb-3.5 pt-3.5 transition-all duration-200 lg:static lg:h-[calc(100vh-60px)] ${
           open ? 'translate-x-0' : '-translate-x-full lg:hidden'
         }`}
       >
@@ -348,114 +371,178 @@ export default function Sidebar({
                         ) : (
                           folderSessions.map((session) => {
                             const isActive = view === 'chat' && activeSessionId === session.id
+                            const isEditing = editingSessionId === session.id
                             return (
                               <div
                                 key={session.id}
-                                draggable
+                                draggable={!isEditing}
                                 onDragStart={(e) => {
+                                  if (isEditing) return
                                   e.dataTransfer.setData('text/plain', session.id)
                                   e.dataTransfer.effectAllowed = 'move'
                                 }}
-                                onClick={() => handleSelectSession(session)}
+                                onClick={() => {
+                                  if (!isEditing) handleSelectSession(session)
+                                }}
                                 className={`group relative flex cursor-pointer items-center justify-between rounded-lg px-2 py-1.5 text-xs transition ${
                                   isActive
                                     ? 'bg-neutral-200/80 font-semibold text-ink'
                                     : 'text-neutral-600 hover:bg-neutral-100 hover:text-ink'
                                 }`}
                               >
-                                <div className="flex items-start gap-2 min-w-0 flex-1">
-                                  <MessageSquare
-                                    size={13}
-                                    className={`mt-0.5 shrink-0 ${
-                                      isActive ? 'text-ocean' : 'text-neutral-400'
-                                    }`}
-                                  />
-                                  <div className="min-w-0 flex-1">
-                                    <p className="truncate text-xs leading-snug">
-                                      {session.title || 'Untitled Session'}
-                                    </p>
-                                    <p className="text-[10px] text-neutral-400 font-normal leading-tight mt-0.5">
-                                      {formatSessionTimestamp(session.timestamp)}
-                                    </p>
-                                  </div>
-                                </div>
-
-                                <div className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
-                                  {/* Move to folder action */}
-                                  <div className="relative">
+                                {isEditing ? (
+                                  <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex w-full items-center gap-1"
+                                  >
+                                    <input
+                                      type="text"
+                                      autoFocus
+                                      value={editingTitle}
+                                      onChange={(e) => setEditingTitle(e.target.value)}
+                                      onBlur={() => saveRenameSession(session.id)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') saveRenameSession(session.id)
+                                        if (e.key === 'Escape') cancelRenameSession()
+                                      }}
+                                      className="min-w-0 flex-1 rounded-md border border-ocean bg-white px-2 py-0.5 text-xs font-medium text-ink outline-none"
+                                      placeholder="Session name..."
+                                    />
                                     <button
                                       type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setMovingSessionId((prev) =>
-                                          prev === session.id ? null : session.id
-                                        )
-                                      }}
-                                      className="rounded p-1 text-neutral-400 hover:bg-neutral-200/80 hover:text-ocean transition"
-                                      title="Move session to folder..."
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => saveRenameSession(session.id)}
+                                      className="rounded p-1 bg-ocean text-white hover:bg-ink transition shrink-0"
+                                      title="Save name"
+                                      aria-label="Save session name"
                                     >
-                                      <FolderInput size={12} />
+                                      <Check size={11} />
                                     </button>
-
-                                    {movingSessionId === session.id && (
-                                      <div
-                                        ref={moveMenuRef}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl text-xs"
-                                      >
-                                        <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                          Move to Folder:
-                                        </div>
-                                        {folders.map((f) => {
-                                          const isCurrent =
-                                            (session.folderId || 'f-general') === f.id
-                                          return (
-                                            <button
-                                              key={f.id}
-                                              type="button"
-                                              disabled={isCurrent}
-                                              onClick={() => {
-                                                onMoveSession?.(session.id, f.id)
-                                                setMovingSessionId(null)
-                                              }}
-                                              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition ${
-                                                isCurrent
-                                                  ? 'opacity-40 cursor-default bg-neutral-50 font-medium'
-                                                  : 'text-neutral-700 hover:bg-ocean/10 hover:text-ocean'
-                                              }`}
-                                            >
-                                              <Folder
-                                                size={12}
-                                                style={{ color: f.color }}
-                                                className="shrink-0"
-                                              />
-                                              <span className="truncate flex-1">{f.name}</span>
-                                              {isCurrent && (
-                                                <Check
-                                                  size={11}
-                                                  className="text-neutral-400 shrink-0"
-                                                />
-                                              )}
-                                            </button>
-                                          )
-                                        })}
-                                      </div>
-                                    )}
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={cancelRenameSession}
+                                      className="rounded p-1 text-neutral-400 hover:bg-neutral-200 hover:text-ink transition shrink-0"
+                                      title="Cancel rename"
+                                      aria-label="Cancel rename"
+                                    >
+                                      <X size={11} />
+                                    </button>
                                   </div>
+                                ) : (
+                                  <>
+                                    <div className="flex items-start gap-2 min-w-0 flex-1">
+                                      <MessageSquare
+                                        size={13}
+                                        className={`mt-0.5 shrink-0 ${
+                                          isActive ? 'text-ocean' : 'text-neutral-400'
+                                        }`}
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="truncate text-xs leading-snug">
+                                          {session.title || 'Untitled Session'}
+                                        </p>
+                                        <p className="text-[10px] text-neutral-400 font-normal leading-tight mt-0.5">
+                                          {formatSessionTimestamp(session.timestamp)}
+                                        </p>
+                                      </div>
+                                    </div>
 
-                                  {/* Delete session */}
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      onDeleteSession(session.id)
-                                    }}
-                                    className="rounded p-1 text-neutral-400 hover:bg-neutral-200/80 hover:text-red-600 transition"
-                                    title="Delete session"
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
+                                    <div className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                                      {/* Rename session */}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => startRenameSession(session, e)}
+                                        className="rounded p-1 text-neutral-400 hover:bg-neutral-200/80 hover:text-ocean transition"
+                                        title="Rename session"
+                                        aria-label="Rename session"
+                                      >
+                                        <Edit2 size={11} />
+                                      </button>
+
+                                      {/* Move to folder action */}
+                                      <div className="relative">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setMovingSessionId((prev) =>
+                                              prev === session.id ? null : session.id
+                                            )
+                                          }}
+                                          className="rounded p-1 text-neutral-400 hover:bg-neutral-200/80 hover:text-ocean transition"
+                                          title="Move session to folder..."
+                                        >
+                                          <FolderInput size={12} />
+                                        </button>
+
+                                        {movingSessionId === session.id && (
+                                          <div
+                                            ref={moveMenuRef}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl text-xs"
+                                          >
+                                            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                                              Move to Folder:
+                                            </div>
+                                            {folders.map((f) => {
+                                              const isCurrent =
+                                                (session.folderId || 'f-general') === f.id
+                                              return (
+                                                <button
+                                                  key={f.id}
+                                                  type="button"
+                                                  disabled={isCurrent}
+                                                  onClick={() => {
+                                                    onMoveSession?.(session.id, f.id)
+                                                    setMovingSessionId(null)
+                                                  }}
+                                                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs transition ${
+                                                    isCurrent
+                                                      ? 'opacity-40 cursor-default bg-neutral-50 font-medium'
+                                                      : 'text-neutral-700 hover:bg-ocean/10 hover:text-ocean'
+                                                  }`}
+                                                >
+                                                  <Folder
+                                                    size={12}
+                                                    style={{ color: f.color }}
+                                                    className="shrink-0"
+                                                  />
+                                                  <span className="truncate flex-1">{f.name}</span>
+                                                  {isCurrent && (
+                                                    <Check
+                                                      size={11}
+                                                      className="text-neutral-400 shrink-0"
+                                                    />
+                                                  )}
+                                                </button>
+                                              )
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Delete session */}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          if (
+                                            window.confirm(
+                                              `Delete chat session "${session.title || 'Untitled Session'}"? This cannot be undone.`
+                                            )
+                                          ) {
+                                            onDeleteSession(session.id)
+                                          }
+                                        }}
+                                        className="rounded p-1 text-neutral-400 hover:bg-neutral-200/80 hover:text-red-600 transition"
+                                        title="Delete session"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             )
                           })
@@ -468,130 +555,139 @@ export default function Sidebar({
             </div>
           </div>
 
-          {/* Research & Benchmarks (Behind Researcher Mode Toggle) */}
-          <div className="rounded-xl border border-neutral-200/80 bg-neutral-50/70 p-2">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-600">
-                Researcher Mode
-              </span>
-              <button
-                type="button"
-                onClick={toggleResearchMode}
-                className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  researchMode ? 'bg-ocean' : 'bg-neutral-300'
-                }`}
-                title="Toggle Researcher & Benchmark Mode"
-                aria-label="Toggle Researcher Mode"
-              >
-                <span
-                  className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                    researchMode ? 'translate-x-3' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {researchMode && (
-              <div className="mt-2 space-y-1 pt-2 border-t border-neutral-200/80">
+          {/* Research & Benchmarks (Admin / Developer Only) */}
+          {isAdmin && (
+            <div className="rounded-xl border border-neutral-200/80 bg-neutral-50/70 p-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-600">
+                  Researcher Mode
+                </span>
                 <button
-                  onClick={() => {
-                    setView('evaluation')
-                    onClose()
-                  }}
-                  className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
-                    view === 'evaluation'
-                      ? 'bg-neutral-200/90 text-ink'
-                      : 'text-neutral-700 hover:bg-neutral-100'
+                  type="button"
+                  onClick={onToggleResearchMode}
+                  className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    researchMode ? 'bg-ocean' : 'bg-neutral-300'
                   }`}
+                  title="Toggle Researcher & Benchmark Mode"
+                  aria-label="Toggle Researcher Mode"
                 >
-                  <div className="flex items-center gap-2">
-                    <BarChart3
-                      size={14}
-                      className={view === 'evaluation' ? 'text-ocean' : 'text-neutral-500'}
-                    />
-                    <span>Evaluation & Metrics</span>
-                  </div>
-                  <ChevronRight size={13} className="text-neutral-500" />
+                  <span
+                    className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      researchMode ? 'translate-x-3' : 'translate-x-0'
+                    }`}
+                  />
                 </button>
               </div>
-            )}
-          </div>
 
-          {/* Execution Mode Selector */}
-          <div>
-            <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
-              Execution Mode
+              {!researchMode && (
+                <div className="mt-1.5 flex items-center gap-1.5 px-1 text-[10px] font-medium text-neutral-500">
+                  <ShieldCheck size={12} className="shrink-0 text-ocean" />
+                  <span>Verified RAG mode active</span>
+                </div>
+              )}
+
+              {researchMode && (
+                <div className="mt-2 space-y-2.5 pt-2 border-t border-neutral-200/80">
+                  <button
+                    onClick={() => {
+                      setView('evaluation')
+                      closeIfMobile()
+                    }}
+                    className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                      view === 'evaluation'
+                        ? 'bg-neutral-200/90 text-ink'
+                        : 'text-neutral-700 hover:bg-neutral-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <BarChart3
+                        size={14}
+                        className={view === 'evaluation' ? 'text-ocean' : 'text-neutral-500'}
+                      />
+                      <span>Evaluation & Metrics</span>
+                    </div>
+                    <ChevronRight size={13} className="text-neutral-500" />
+                  </button>
+
+                  {/* Execution Mode Selector (Researcher Mode Only) */}
+                  <div>
+                    <div className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">
+                      Execution Mode
+                    </div>
+                    <div className="rounded-xl border border-neutral-200/80 bg-white p-1 shadow-2xs space-y-1">
+                      <button
+                        onClick={() => setMode('rag_verified')}
+                        className={`flex w-full items-start gap-2 rounded-lg p-2 text-left transition ${
+                          mode === 'rag_verified'
+                            ? 'bg-mint/60 text-ocean'
+                            : 'text-neutral-600 hover:bg-neutral-50'
+                        }`}
+                      >
+                        <ShieldCheck size={15} className="mt-0.5 shrink-0 text-ocean" />
+                        <div>
+                          <div className="text-xs font-bold leading-none">Cloud RAG (Verified)</div>
+                          <div className="text-[10px] opacity-75 mt-0.5">Triad retrieval & NLI checks</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setMode('baseline')}
+                        className={`flex w-full items-start gap-2 rounded-lg p-2 text-left transition ${
+                          mode === 'baseline'
+                            ? 'bg-neutral-100 text-ink font-semibold'
+                            : 'text-neutral-500 hover:bg-neutral-50'
+                        }`}
+                      >
+                        <Cloud size={15} className={`mt-0.5 shrink-0 ${mode === 'baseline' ? 'text-amber-600' : 'text-neutral-400'}`} />
+                        <div>
+                          <div className="text-xs font-semibold leading-none">Cloud Baseline</div>
+                          <div className="text-[10px] opacity-75 mt-0.5">Parametric zero-shot (No RAG)</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setMode('ollama_rag')}
+                        className={`flex w-full items-start gap-2 rounded-lg p-2 text-left transition ${
+                          mode === 'ollama_rag'
+                            ? 'bg-purple-50 text-purple-700 font-bold border border-purple-200'
+                            : 'text-neutral-600 hover:bg-neutral-50'
+                        }`}
+                      >
+                        <ShieldCheck size={15} className="mt-0.5 shrink-0 text-purple-600" />
+                        <div>
+                          <div className="text-xs font-bold leading-none">Local RAG (Ollama)</div>
+                          <div className="text-[10px] opacity-75 mt-0.5">On-device Triad retrieval & NLI</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setMode('ollama_baseline')}
+                        className={`flex w-full items-start gap-2 rounded-lg p-2 text-left transition ${
+                          mode === 'ollama_baseline'
+                            ? 'bg-neutral-100 text-ink font-semibold'
+                            : 'text-neutral-500 hover:bg-neutral-50'
+                        }`}
+                      >
+                        <Cpu size={15} className={`mt-0.5 shrink-0 ${mode === 'ollama_baseline' ? 'text-purple-600' : 'text-neutral-400'}`} />
+                        <div>
+                          <div className="text-xs font-semibold leading-none">Local Baseline (Ollama)</div>
+                          <div className="text-[10px] opacity-75 mt-0.5">On-device zero-shot (No RAG)</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="rounded-xl border border-neutral-200/80 bg-white p-1 shadow-2xs space-y-1">
-              <button
-                onClick={() => setMode('rag_verified')}
-                className={`flex w-full items-start gap-2 rounded-lg p-2 text-left transition ${
-                  mode === 'rag_verified'
-                    ? 'bg-mint/60 text-ocean'
-                    : 'text-neutral-600 hover:bg-neutral-50'
-                }`}
-              >
-                <ShieldCheck size={15} className="mt-0.5 shrink-0 text-ocean" />
-                <div>
-                  <div className="text-xs font-bold leading-none">Cloud RAG (Verified)</div>
-                  <div className="text-[10px] opacity-75 mt-0.5">Triad retrieval & NLI checks</div>
-                </div>
-              </button>
-              <button
-                onClick={() => setMode('baseline')}
-                className={`flex w-full items-start gap-2 rounded-lg p-2 text-left transition ${
-                  mode === 'baseline'
-                    ? 'bg-neutral-100 text-ink font-semibold'
-                    : 'text-neutral-500 hover:bg-neutral-50'
-                }`}
-              >
-                <Cloud size={15} className={`mt-0.5 shrink-0 ${mode === 'baseline' ? 'text-amber-600' : 'text-neutral-400'}`} />
-                <div>
-                  <div className="text-xs font-semibold leading-none">Cloud Baseline</div>
-                  <div className="text-[10px] opacity-75 mt-0.5">Parametric zero-shot (No RAG)</div>
-                </div>
-              </button>
-              <button
-                onClick={() => setMode('ollama_rag')}
-                className={`flex w-full items-start gap-2 rounded-lg p-2 text-left transition ${
-                  mode === 'ollama_rag'
-                    ? 'bg-purple-50 text-purple-700 font-bold border border-purple-200'
-                    : 'text-neutral-600 hover:bg-neutral-50'
-                }`}
-              >
-                <ShieldCheck size={15} className="mt-0.5 shrink-0 text-purple-600" />
-                <div>
-                  <div className="text-xs font-bold leading-none">Local RAG (Ollama)</div>
-                  <div className="text-[10px] opacity-75 mt-0.5">On-device Triad retrieval & NLI</div>
-                </div>
-              </button>
-              <button
-                onClick={() => setMode('ollama_baseline')}
-                className={`flex w-full items-start gap-2 rounded-lg p-2 text-left transition ${
-                  mode === 'ollama_baseline'
-                    ? 'bg-neutral-100 text-ink font-semibold'
-                    : 'text-neutral-500 hover:bg-neutral-50'
-                }`}
-              >
-                <Cpu size={15} className={`mt-0.5 shrink-0 ${mode === 'ollama_baseline' ? 'text-purple-600' : 'text-neutral-400'}`} />
-                <div>
-                  <div className="text-xs font-semibold leading-none">Local Baseline (Ollama)</div>
-                  <div className="text-[10px] opacity-75 mt-0.5">On-device zero-shot (No RAG)</div>
-                </div>
-              </button>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Bottom Left Footer: Research Pill & User Profile / Settings / Log Out */}
+        {/* Bottom Left Footer: Research Pill & User Profile / Settings / Sign Out */}
         <div className="mt-auto pt-2.5 border-t border-neutral-200/70 space-y-2">
           {/* Transparent Educational & Academic Tool Disclaimer */}
-          <div className="flex items-center justify-between rounded-lg bg-neutral-100/80 px-2 py-1 text-[11px] text-neutral-600">
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-between gap-2 rounded-lg bg-neutral-100/80 px-2 py-1 text-[11px] text-neutral-600">
+            <div className="flex items-center gap-1.5 min-w-0">
               <HeartPulse size={12} className="text-coral shrink-0" />
-              <span className="font-semibold text-neutral-700">Educational Tool</span>
+              <span className="font-semibold text-neutral-700 truncate">Educational Tool</span>
             </div>
-            <span className="text-[10px] font-medium text-neutral-500">For Medical Study</span>
+            <span className="text-[10px] font-medium text-neutral-500 shrink-0">For Medical Study</span>
           </div>
 
           {/* User Profile Card & Action Bar */}
@@ -618,32 +714,43 @@ export default function Sidebar({
                   <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-white bg-emerald-500" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-semibold text-ink truncate leading-tight">
-                    {userProfile?.name || 'Daniel Puah'}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-ink truncate leading-tight">
+                      {userProfile?.name || 'Daniel Puah'}
+                    </span>
+                    <span
+                      className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase ${
+                        isAdmin
+                          ? 'bg-mint text-ocean'
+                          : 'bg-neutral-100 text-neutral-600'
+                      }`}
+                    >
+                      {isAdmin ? 'Admin' : 'Clinician'}
+                    </span>
                   </div>
                   <div className="text-[10px] text-neutral-500 font-medium truncate leading-tight mt-0.5">
-                    {userProfile?.role || 'Medical Student / Researcher'}
+                    {userProfile?.role || (isAdmin ? 'Researcher / Developer' : 'Clinician / Medical Learner')}
                   </div>
                 </div>
               </button>
 
-              {/* Action Buttons: Settings & Log Out */}
+              {/* Action Buttons: Settings & Sign Out */}
               <div className="flex items-center gap-0.5 shrink-0 ml-1">
                 <button
                   type="button"
                   onClick={onOpenSettings}
                   className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-ink transition"
-                  title="Settings"
-                  aria-label="Settings"
+                  title="Workspace Settings"
+                  aria-label="Workspace Settings"
                 >
                   <Settings size={15} />
                 </button>
                 <button
                   type="button"
-                  onClick={onLogOut}
+                  onClick={onSignOut}
                   className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-500 transition"
-                  title="Log out"
-                  aria-label="Log out"
+                  title="Sign out / Switch account"
+                  aria-label="Sign out"
                 >
                   <LogOut size={15} />
                 </button>
@@ -657,11 +764,26 @@ export default function Sidebar({
                 className="absolute bottom-full left-0 mb-1.5 z-50 w-full rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl text-xs"
               >
                 <div className="px-2.5 py-2 border-b border-neutral-100">
-                  <div className="font-semibold text-ink text-xs">{userProfile?.name || 'Dr. Daniel'}</div>
-                  <div className="text-[10px] text-neutral-400">{userProfile?.email || 'daniel.puah@clinical.org'}</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-ink text-xs truncate">
+                      {userProfile?.name || 'Daniel Puah'}
+                    </span>
+                    <span
+                      className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                        isAdmin ? 'bg-mint text-ocean' : 'bg-neutral-100 text-neutral-600'
+                      }`}
+                    >
+                      {isAdmin ? 'Admin' : 'Clinician'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-neutral-400 truncate mt-0.5">
+                    {userProfile?.email || 'admin@neuroevidence.edu'}
+                  </div>
                   <div className="text-[10px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span>Clinician Workspace Active</span>
+                    <span>
+                      {isAdmin ? 'Admin · Full Research Controls' : 'Clinician · Verified RAG Only'}
+                    </span>
                   </div>
                 </div>
                 <div className="py-1">
@@ -674,7 +796,7 @@ export default function Sidebar({
                     className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-neutral-700 hover:bg-neutral-100 transition"
                   >
                     <Settings size={14} className="text-neutral-500" />
-                    <span>Workspace Settings</span>
+                    <span>Edit Profile & Settings</span>
                   </button>
                 </div>
                 <div className="pt-1 border-t border-neutral-100">
@@ -682,12 +804,12 @@ export default function Sidebar({
                     type="button"
                     onClick={() => {
                       setUserMenuOpen(false)
-                      onLogOut()
+                      onSignOut?.()
                     }}
                     className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-red-600 hover:bg-red-50 transition"
                   >
                     <LogOut size={14} />
-                    <span>Sign Out</span>
+                    <span>Sign Out / Switch Account</span>
                   </button>
                 </div>
               </div>

@@ -1,13 +1,15 @@
 import { useMemo } from 'react'
 import {
   Activity,
+  ArrowLeft,
   Clock3,
   FlaskConical,
   MessageSquareText,
+  RefreshCw,
   ShieldCheck,
 } from 'lucide-react'
 
-export default function EvaluationView({ summary }) {
+export default function EvaluationView({ summary, loading = false, onRefresh, onBackToChat }) {
   const cards = useMemo(
     () => [
       ['Recorded traces', summary?.total_traces ?? 0, Activity, 'All local experiments'],
@@ -21,7 +23,7 @@ export default function EvaluationView({ summary }) {
       ],
       [
         'Average latency',
-        summary?.average_latency_ms != null ? `${summary.average_latency_ms} ms` : '—',
+        summary?.average_latency_ms != null ? `${Math.round(summary.average_latency_ms)} ms` : '—',
         Clock3,
         'Across all modes',
       ],
@@ -48,12 +50,37 @@ export default function EvaluationView({ summary }) {
   return (
     <div className="min-h-[calc(100vh-65px)] overflow-y-auto px-6 py-8 lg:px-10">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-8">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ocean">Local Research Dashboard</p>
-          <h1 className="mt-1 font-display text-3xl font-bold text-ink">Evaluation Overview</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
-            Descriptive metrics calculated from local experiment traces. Thesis benchmarks should be validated against the locked baseline test suite.
-          </p>
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-ocean">Local Research Dashboard</p>
+            <h1 className="mt-1 font-display text-3xl font-bold text-ink">Evaluation Overview</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+              Descriptive metrics calculated from local experiment traces. Thesis benchmarks should be validated against the locked baseline test suite.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {onRefresh && (
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={loading}
+                className="flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3.5 py-2 text-xs font-semibold text-neutral-700 shadow-2xs hover:bg-neutral-50 transition disabled:opacity-50"
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
+              </button>
+            )}
+            {onBackToChat && (
+              <button
+                type="button"
+                onClick={onBackToChat}
+                className="flex items-center gap-1.5 rounded-xl bg-ink px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-ocean transition"
+              >
+                <ArrowLeft size={14} />
+                <span>Back to Chat</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -74,8 +101,9 @@ export default function EvaluationView({ summary }) {
             title="Runs by execution mode"
             data={summary?.by_mode}
             labels={{
-              rag_verified: 'Verified RAG (Proposed)',
+              rag_verified: 'Cloud RAG (Verified)',
               baseline: 'Cloud Baseline (Zero-Shot)',
+              ollama_rag: 'Local RAG (Ollama)',
               ollama_baseline: 'Local Baseline (Ollama)',
             }}
           />

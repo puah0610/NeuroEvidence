@@ -1,12 +1,16 @@
 from contextlib import asynccontextmanager
 from ipaddress import ip_address
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .database import Database
 from .models import (
+    AuthLoginRequest,
+    AuthRegisterRequest,
+    AuthResponse,
     ChatRequest,
     ChatResponse,
     EvaluationSummary,
@@ -14,8 +18,10 @@ from .models import (
     FeedbackResponse,
     HealthResponse,
     SourceRecord,
+    UserProfilePayload,
 )
 from .service import ChatService
+from .user_store import UserWorkspaceStore
 
 
 @asynccontextmanager
@@ -27,8 +33,10 @@ async def lifespan(app: FastAPI):
         os.environ["LANGFUSE_SECRET_KEY"] = settings.langfuse_secret_key.strip()
         os.environ["LANGFUSE_HOST"] = settings.langfuse_host.strip()
     database = Database(settings.database_path)
+    user_store = UserWorkspaceStore(settings.database_path.parent / "users")
     app.state.settings = settings
     app.state.database = database
+    app.state.user_store = user_store
     app.state.chat_service = ChatService(settings, database)
     yield
 
@@ -70,16 +78,16 @@ async def source(source_id: str, request: Request) -> SourceRecord:
 @app.post("/api/feedback", response_model=FeedbackResponse, status_code=201)
 async def feedback(payload: FeedbackRequest, request: Request) -> FeedbackResponse:
     feedback_id = request.app.state.database.save_feedback(payload)
-    if payload.trace_id and getattr(request.app.state.settings, "langfuse_enabled", False):
+    if payload.trace_id and payload.helpful is not None and getattr(request.app.state.settings, "langfuse_enabled", False):
         try:
             from langfuse import get_client
             client = get_client()
-            val = 1.0 if payload.rating == "helpful" else 0.0
+            val = 1.0 if payload.helpful else 0.0
             client.create_score(
                 name="user_feedback",
                 value=val,
                 trace_id=payload.trace_id,
-                comment=payload.comment or None,
+                comment=payload.comment or payload.issue_type or None,
                 data_type="NUMERIC",
             )
         except Exception as exc:
@@ -122,6 +130,119 @@ async def health(request: Request) -> HealthResponse:
         generation=gen_status,
         nli="lexical-demo" if not current.enable_nli else current.nli_model,
     )
+
+
+@app.post("/api/auth/register", response_model=AuthResponse, status_code=201)
+async def register_user(payload: AuthRegisterRequest, request: Request) -> AuthResponse:
+    try:
+        user = request.app.state.database.register_user(
+            username=payload.username,
+            email=payload.email,
+            password=payload.password,
+            full_name=payload.full_name,
+            institution=payload.institution,
+            specialty=payload.specialty,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        status = 409 if "already registered" in msg.lower() else 400
+        raise HTTPException(status_code=status, detail=msg)
+
+    ws = request.app.state.user_store.load_workspace(user["user_id"])
+    return AuthResponse(
+        user_id=user["user_id"],
+        username=user["username"],
+        account_role=user["account_role"],
+        profile=UserProfilePayload(**user["profile"]),
+        storage_path=ws["storage_path"],
+    )
+
+
+@app.post("/api/auth/login", response_model=AuthResponse)
+async def login_user(payload: AuthLoginRequest, request: Request) -> AuthResponse:
+    user = request.app.state.database.authenticate_user(payload.identifier, payload.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+    ws = request.app.state.user_store.load_workspace(user["user_id"])
+    return AuthResponse(
+        user_id=user["user_id"],
+        username=user["username"],
+        account_role=user["account_role"],
+        profile=UserProfilePayload(**user["profile"]),
+        storage_path=ws["storage_path"],
+    )
+
+
+@app.put("/api/users/{user_id}/profile")
+async def update_user_profile(
+    user_id: str,
+    payload: UserProfilePayload,
+    request: Request,
+) -> dict[str, Any]:
+    try:
+        updated = request.app.state.database.update_user_profile(user_id, payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"saved": True, "profile": updated["profile"]}
+
+
+@app.get("/api/users/{user_id}/workspace")
+async def get_user_workspace(user_id: str, request: Request) -> dict[str, Any]:
+    try:
+        return request.app.state.user_store.load_workspace(user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.put("/api/users/{user_id}/folders")
+async def save_user_folders(
+    user_id: str,
+    request: Request,
+    payload: dict[str, Any] = Body(...),
+) -> dict[str, Any]:
+    folders = payload.get("folders")
+    if not isinstance(folders, list):
+        raise HTTPException(status_code=400, detail="folders must be a list")
+    try:
+        saved = request.app.state.user_store.save_folders(user_id, folders)
+        return {"saved": True, "folders": saved}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.put("/api/users/{user_id}/sessions/{session_id}")
+async def save_user_session(
+    user_id: str,
+    session_id: str,
+    request: Request,
+    payload: dict[str, Any] = Body(...),
+) -> dict[str, Any]:
+    try:
+        saved = request.app.state.user_store.save_session(user_id, session_id, payload)
+        return {"saved": True, "session": saved}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.delete("/api/users/{user_id}/sessions/{session_id}")
+async def delete_user_session(user_id: str, session_id: str, request: Request) -> dict[str, Any]:
+    try:
+        deleted = request.app.state.user_store.delete_session(user_id, session_id)
+        return {"deleted": deleted}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.delete("/api/users/{user_id}/sessions")
+async def clear_user_sessions(user_id: str, request: Request) -> dict[str, Any]:
+    try:
+        deleted_count = request.app.state.user_store.clear_sessions(user_id)
+        return {"deleted_count": deleted_count}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.get("/")

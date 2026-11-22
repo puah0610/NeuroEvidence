@@ -16,6 +16,19 @@ export function cleanLatexMath(text) {
   return cleaned
 }
 
+export function cleanSourceExcerpt(raw) {
+  if (!raw) return ''
+  let text = String(raw).trim()
+  // Strip leading markdown breadcrumb header e.g. "### [Layer 3 > Parkinson'S Disease > ...]"
+  text = text.replace(/^###\s*\[[^\]]*\]\s*/i, '')
+  // Strip inline **Document:** ... or **Section:** ... metadata lines
+  text = text.replace(/^\*\*(?:Document|Section|Source|Title):\*\*[^\n]*\n*/gim, '')
+  text = text.replace(/\*\*(?:Document|Section|Source):\*\*\s*[^.\n]+(?:\n+|\s{2,})/gi, '')
+  // Clean remaining markdown bold markers & LaTeX
+  text = cleanLatexMath(text).replace(/\*\*(.*?)\*\*/g, '$1').trim()
+  return text || cleanLatexMath(String(raw).trim())
+}
+
 export function parseAnswerBlocks(text) {
   if (!text) return []
   const rawLines = text.split('\n').filter((l) => l.trim().length > 0)

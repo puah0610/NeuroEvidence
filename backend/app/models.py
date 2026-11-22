@@ -33,6 +33,7 @@ class ChatRequest(BaseModel):
     force_live_pubmed: bool | None = None
     history: list[dict[str, str]] = Field(default_factory=list)
     question_id: str | None = None
+    user_id: str | None = Field(default=None, max_length=100)
 
 
 from .ddi.models import DDIReport
@@ -166,3 +167,33 @@ class HealthResponse(BaseModel):
     vector_store: str
     generation: str
     nli: str
+
+
+class UserProfilePayload(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    role: str = Field(default="Clinician / Medical Learner", max_length=120)
+    email: str = Field(min_length=3, max_length=160)
+    specialty: str = Field(default="Neurology", max_length=120)
+    institution: str = Field(default="Neurology Teaching Hospital", max_length=160)
+
+
+class AuthRegisterRequest(BaseModel):
+    username: str = Field(min_length=2, max_length=40)
+    email: str = Field(min_length=3, max_length=160)
+    password: str = Field(min_length=4, max_length=128)
+    full_name: str | None = Field(default=None, max_length=120)
+    institution: str | None = Field(default=None, max_length=160)
+    specialty: str | None = Field(default=None, max_length=120)
+
+
+class AuthLoginRequest(BaseModel):
+    identifier: str = Field(min_length=1, max_length=160)
+    password: str = Field(min_length=1, max_length=128)
+
+
+class AuthResponse(BaseModel):
+    user_id: str
+    username: str
+    account_role: Literal["admin", "clinician"]
+    profile: UserProfilePayload
+    storage_path: str

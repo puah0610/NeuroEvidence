@@ -6,9 +6,12 @@ import {
   Edit2,
   Folder,
   Layers,
+  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   RotateCcw,
+  Sun,
+  X,
 } from 'lucide-react'
 import { formatSessionTimestamp } from '../../utils/sessionStore'
 
@@ -23,6 +26,8 @@ export default function Header({
   onMoveSession,
   sidebarOpen,
   onToggleSidebar,
+  theme = 'light',
+  onToggleTheme,
 }) {
   const [editing, setEditing] = useState(false)
   const [tempTitle, setTempTitle] = useState('')
@@ -38,6 +43,10 @@ export default function Header({
     document.addEventListener('pointerdown', handleClickOutside)
     return () => document.removeEventListener('pointerdown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    setEditing(false)
+  }, [activeSession?.id])
 
   const currentFolder =
     folders?.find((f) => f.id === (activeSession?.folderId || 'f-general')) ||
@@ -104,14 +113,32 @@ export default function Header({
                   autoFocus
                   value={tempTitle}
                   onChange={(e) => setTempTitle(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                  onBlur={saveEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveEdit()
+                    if (e.key === 'Escape') setEditing(false)
+                  }}
                   className="rounded-lg border border-ocean px-2 py-0.5 text-xs font-semibold text-ink outline-none"
                 />
                 <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={saveEdit}
                   className="rounded-md bg-ocean p-1 text-white hover:bg-ink transition"
+                  title="Save name"
+                  aria-label="Save session name"
                 >
                   <Check size={12} />
+                </button>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setEditing(false)}
+                  className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 hover:text-ink transition"
+                  title="Cancel rename"
+                  aria-label="Cancel rename"
+                >
+                  <X size={12} />
                 </button>
               </div>
             ) : (
@@ -201,6 +228,30 @@ export default function Header({
             <span>Educational & Research Study Tool · Not for clinical prescribing</span>
           </div>
 
+          {/* 3-Layer Triad Knowledge Base Overview */}
+          <button
+            type="button"
+            onClick={onOpenTriad}
+            className="flex items-center gap-1.5 rounded-lg border border-ocean/25 bg-mint/40 px-2.5 py-1.5 text-[11px] font-semibold text-ocean hover:bg-mint/80 transition"
+            title="Inspect 3-Layer Triad Knowledge Base architecture"
+          >
+            <Layers size={13} />
+            <span className="hidden sm:inline">3-Layer Triad</span>
+          </button>
+
+          {/* Light / Dark Theme Toggle */}
+          {onToggleTheme && (
+            <button
+              type="button"
+              onClick={onToggleTheme}
+              className="flex items-center justify-center rounded-lg border border-neutral-200 p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-ink transition"
+              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              aria-label={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+          )}
+
           {/* Health indicator */}
           <div className="flex items-center gap-1.5 rounded-lg border border-neutral-200/80 bg-neutral-50/80 px-2.5 py-1.5 text-[11px] font-medium text-neutral-600">
             <span
@@ -215,8 +266,17 @@ export default function Header({
 
           {/* Clear Session */}
           <button
-            onClick={onClearSession}
-            className="flex items-center gap-1 rounded-lg border border-neutral-200 p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-ink transition"
+            type="button"
+            disabled={!activeSession?.messages?.length}
+            onClick={() => {
+              if (
+                activeSession?.messages?.length &&
+                window.confirm('Clear all messages in this chat session?')
+              ) {
+                onClearSession()
+              }
+            }}
+            className="flex items-center gap-1 rounded-lg border border-neutral-200 p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-ink transition disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent"
             title="Clear current session chat"
           >
             <RotateCcw size={15} />
