@@ -61,14 +61,22 @@ Configure your runtime in `.env`:
 - **Offline Demo Mode:** Keep `DEMO_MODE=true` with no API keys to run completely offline. *(Setting `DEMO_MODE=true` alongside a valid API key or Ollama enables **Smart Demo Mode** + **HyDE**).*
 - **NLI Transformer & Observability (Optional):** Set `ENABLE_NLI=true` with `NLI_MODEL=pritamdeka/PubMedBERT-MNLI-MedNLI` for neural claim verification, and provide `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` for Langfuse tracing.
 
-### 2. Backend Setup
+### 2. Backend Setup (Python 3.11)
+
+> [!TIP]
+> **Python Version:** Use **Python 3.11** (tested on `3.11.9`, pinned in `.python-version`). If your system default is a newer version (e.g., Python 3.14), install Python 3.11 alongside it (`winget install Python.Python.3.11` on Windows or `brew install python@3.11` on macOS) and create the virtual environment explicitly with `py -3.11` / `python3.11` (or `uv venv --python 3.11.9 .venv`).
 
 ```powershell
-python -m venv .venv
+# Windows (PowerShell) — if an older .venv exists with a different Python version, remove it first:
+# Remove-Item -Recurse -Force .venv
+py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+python --version   # Verify Python 3.11.x
 pip install -r backend/requirements.txt
 uvicorn app.main:app --reload --app-dir backend
 ```
+
+*(macOS / Linux: `python3.11 -m venv .venv && source .venv/bin/activate && pip install -r backend/requirements.txt`)*
 
 - API Server: `http://localhost:8000`
 - Interactive OpenAPI Docs: `http://localhost:8000/docs`
