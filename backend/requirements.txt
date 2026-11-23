@@ -10,5 +10,5 @@ numpy>=2.0,<3
 python-dotenv>=1.0,<2
 pytest>=8.3,<9
 pytest-asyncio>=0.25,<1
-langfuse>=2.0.0,<3
+langfuse>=5.0.0,<6
 
